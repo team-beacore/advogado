@@ -1,0 +1,662 @@
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { apiGet, apiPost, apiPatch, apiDelete, apiUpload, downloadUrl } from '../api/client';
+import {
+  Button, SecondaryButton, Input, Select, Card, Badge, EmptyState, ErrorAlert, Textarea,
+  formatDate, formatDateTime, formatBytes, statusColor, statusLabel, Modal,
+} from '../components/ui';
+
+interface ProcessDetail {
+  id: string;
+  title: string;
+  process_number: string | null;
+  court: string | null;
+  jurisdiction: string | null;
+  area: string | null;
+  status: string;
+  description: string | null;
+  client_name: string | null;
+  client_id: string | null;
+  responsible_name: string | null;
+  responsible_id: string | null;
+  events: Array<Record<string, unknown>>;
+  documents: Array<Record<string, unknown>>;
+  publications: Array<Record<string, unknown>>;
+  tasks: Array<Record<string, unknown>>;
+}
+
+interface AiInteraction {
+  id: string;
+  type: string;
+  model: string | null;
+  output: { rawText?: string; structured?: Record<string, unknown> | null; disclaimer?: string } | null;
+  created_at: string;
+  approvals: Array<{ id: string; status: string; reviewed_at: string | null; edited_output: Record<string, unknown> | null }> | null;
+}
+
+type Tab = 'visao' | 'timeline' | 'documentos' | 'intimacoes' | 'tarefas' | 'ia' | 'auditoria';
+
+export default function ProcessDetail() {
+  const { id } = useParams();
+  const [data, setData] = useState<ProcessDetail | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<Tab>('visao');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await apiGet<ProcessDetail>(`/api/processes/${id}`);
+      setData(res);
+    } catch (e) {
+      setError(e);
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const refresh = async () => {
+    const res = await apiGet<ProcessDetail>(`/api/processes/${id}`);
+    setData(res);
+  };
+
+  const tabs: Array<{ key: Tab; label: string }> = [
+    { key: 'visao', label: 'Visão geral' },
+    { key: 'timeline', label: 'Timeline' },
+    { key: 'documentos', label: `Documentos (${data?.documents.length ?? 0})` },
+    { key: 'intimacoes', label: `Intimações (${data?.publications.length ?? 0})` },
+    { key: 'tarefas', label: `Tarefas (${data?.tasks.length ?? 0})` },
+    { key: 'ia', label: 'IA' },
+    { key: 'auditoria', label: 'Auditoria' },
+  ];
+
+  if (loading) return <div className="text-gray-500">Carregando…</div>;
+  if (error) return <ErrorAlert error={error} />;
+  if (!data) return null;
+
+  return (
+    <div>
+      <div className="mb-6">
+        <Link to="/processos" className="text-sm text-brand-600 hover:underline">← Processos</Link>
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-semibold">{data.title}</h1>
+          <Badge color={statusColor(data.status)}>{statusLabel(data.status)}</Badge>
+        </div>
+        <div className="mt-1 text-sm text-gray-500">
+          {data.process_number && <span className="mr-3">{data.process_number}</span>}
+          {data.court && <span className="mr-3">{data.court}</span>}
+          {data.area && <span className="mr-3">{data.area}</span>}
+          {data.client_name && <span className="mr-3">Cliente: <b>{data.client_name}</b></span>}
+          {data.responsible_name && <span>Responsável: <b>{data.responsible_name}</b></span>}
+        </div>
+      </div>
+
+      <div className="mb-6 flex flex-wrap gap-1 border-b border-gray-200">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${tab === t.key ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-800'}`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'visao' && <Overview data={data} />}
+      {tab === 'timeline' && <TimelineTab data={data} onRefresh={refresh} />}
+      {tab === 'documentos' && <DocumentsTab data={data} onRefresh={refresh} />}
+      {tab === 'intimacoes' && <PublicationsTab data={data} onRefresh={refresh} />}
+      {tab === 'tarefas' && <TasksTab data={data} onRefresh={refresh} />}
+      {tab === 'ia' && <AiTab processId={data.id} onRefresh={refresh} />}
+      {tab === 'auditoria' && <AuditTab processId={data.id} />}
+    </div>
+  );
+}
+
+function Overview({ data }: { data: ProcessDetail }) {
+  return (
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className="lg:col-span-2">
+        <Card title="Resumo">
+          <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div><dt className="text-xs text-gray-500">Título</dt><dd className="text-sm">{data.title}</dd></div>
+            <div><dt className="text-xs text-gray-500">Número</dt><dd className="text-sm">{data.process_number ?? '—'}</dd></div>
+            <div><dt className="text-xs text-gray-500">Tribunal</dt><dd className="text-sm">{data.court ?? '—'}</dd></div>
+            <div><dt className="text-xs text-gray-500">Jurisdição</dt><dd className="text-sm">{data.jurisdiction ?? '—'}</dd></div>
+            <div><dt className="text-xs text-gray-500">Área</dt><dd className="text-sm">{data.area ?? '—'}</dd></div>
+            <div><dt className="text-xs text-gray-500">Status</dt><dd className="text-sm">{statusLabel(data.status)}</dd></div>
+            <div><dt className="text-xs text-gray-500">Cliente</dt><dd className="text-sm">{data.client_name ?? '—'}</dd></div>
+            <div><dt className="text-xs text-gray-500">Responsável</dt><dd className="text-sm">{data.responsible_name ?? '—'}</dd></div>
+          </dl>
+          {data.description && <p className="mt-4 text-sm text-gray-700">{data.description}</p>}
+        </Card>
+      </div>
+      <div>
+        <Card title="Contadores">
+          <ul className="space-y-2 text-sm">
+            <li className="flex justify-between"><span>Documentos</span><b>{data.documents.length}</b></li>
+            <li className="flex justify-between"><span>Intimações</span><b>{data.publications.length}</b></li>
+            <li className="flex justify-between"><span>Tarefas</span><b>{data.tasks.length}</b></li>
+            <li className="flex justify-between"><span>Eventos na timeline</span><b>{data.events.length}</b></li>
+          </ul>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function TimelineTab({ data, onRefresh }: { data: ProcessDetail; onRefresh: () => Promise<void> }) {
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ title: '', description: '' });
+  const [formError, setFormError] = useState<unknown>(null);
+
+  const addEvent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+    try {
+      await apiPost(`/api/processes/${data.id}/events`, { ...form, type: 'NOTE_ADDED', source: 'manual' });
+      setShowAdd(false);
+      setForm({ title: '', description: '' });
+      await onRefresh();
+    } catch (err) { setFormError(err); }
+  };
+
+  return (
+    <div>
+      <div className="mb-4 flex justify-end">
+        <Button onClick={() => setShowAdd(true)}>Adicionar evento</Button>
+      </div>
+      {data.events.length === 0 ? (
+        <EmptyState title="Nenhum evento registrado." hint="Eventos reais aparecem aqui automaticamente." />
+      ) : (
+        <ol className="relative space-y-4 border-l border-gray-200 pl-6">
+          {data.events.map((e) => (
+            <li key={String(e.id)} className="relative">
+              <span className="absolute -left-[31px] mt-1.5 h-3 w-3 rounded-full border-2 border-brand-600 bg-white" />
+              <div className="text-sm font-medium">{String(e.title)}</div>
+              {Boolean(e.description) && <div className="text-sm text-gray-600">{String(e.description)}</div>}
+              <div className="mt-0.5 text-xs text-gray-400">
+                {formatDateTime(String(e.created_at))} {Boolean(e.created_by_name) && <span>· {String(e.created_by_name)}</span>}
+                {Boolean(e.source) && <span> · {String(e.source)}</span>}
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+
+      <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Adicionar evento">
+        <form onSubmit={addEvent} className="space-y-3">
+          <ErrorAlert error={formError} />
+          <div>
+            <label className="mb-1 block text-sm font-medium">Título *</label>
+            <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">Descrição</label>
+            <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+          </div>
+          <Button type="submit" className="w-full">Adicionar</Button>
+        </form>
+      </Modal>
+    </div>
+  );
+}
+
+function DocumentsTab({ data, onRefresh }: { data: ProcessDetail; onRefresh: () => Promise<void> }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('processId', data.id);
+      formData.append('name', file.name);
+      await apiUpload('/api/documents', formData);
+      await onRefresh();
+    } catch (err) { setError(err); }
+    finally { setUploading(false); e.target.value = ''; }
+  };
+
+  const handleDelete = async (docId: string) => {
+    if (!confirm('Excluir este documento?')) return;
+    try {
+      await apiDelete(`/api/documents/${docId}`);
+      await onRefresh();
+    } catch (err) { setError(err); }
+  };
+
+  return (
+    <div>
+      <div className="mb-4 flex items-center justify-between">
+        <div className="text-sm text-gray-500">{data.documents.length} documento(s)</div>
+        <label className="inline-flex cursor-pointer items-center rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+          {uploading ? 'Enviando…' : 'Anexar documento'}
+          <input type="file" className="hidden" onChange={handleUpload} disabled={uploading} />
+        </label>
+      </div>
+      <ErrorAlert error={error} />
+      {data.documents.length === 0 ? (
+        <EmptyState title="Nenhum documento anexado." hint="Anexe um arquivo (PDF, DOCX, imagem…)." />
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-gray-200">
+          <table className="min-w-full divide-y divide-gray-200 text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-2 text-left font-medium text-gray-500">Nome</th>
+                <th className="px-4 py-2 text-left font-medium text-gray-500">Tipo</th>
+                <th className="px-4 py-2 text-left font-medium text-gray-500">Tamanho</th>
+                <th className="px-4 py-2 text-left font-medium text-gray-500">Enviado por</th>
+                <th className="px-4 py-2 text-left font-medium text-gray-500">Data</th>
+                <th className="px-4 py-2"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {data.documents.map((d) => (
+                <tr key={String(d.id)}>
+                  <td className="px-4 py-2">{String(d.name)}</td>
+                  <td className="px-4 py-2 text-xs text-gray-500">{String(d.mime_type)}</td>
+                  <td className="px-4 py-2 text-gray-500">{formatBytes(Number(d.size))}</td>
+                  <td className="px-4 py-2 text-gray-500">{String(d.uploaded_by_name ?? '')}</td>
+                  <td className="px-4 py-2 text-gray-500">{formatDate(String(d.created_at))}</td>
+                  <td className="px-4 py-2 text-right">
+                    <a href={downloadUrl(`/api/documents/${String(d.id)}/download`)} className="mr-2 text-brand-600 hover:underline">Baixar</a>
+                    <button onClick={() => handleDelete(String(d.id))} className="text-red-600 hover:underline">Excluir</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PublicationsTab({ data, onRefresh }: { data: ProcessDetail; onRefresh: () => Promise<void> }) {
+  const [showCreate, setShowCreate] = useState(false);
+  const [form, setForm] = useState({ source: '', content: '', externalReference: '', possibleDueDate: '', availabilityDate: '' });
+  const [formError, setFormError] = useState<unknown>(null);
+  const [analyzing, setAnalyzing] = useState<string | null>(null);
+  const [analysis, setAnalysis] = useState<Record<string, unknown> | null>(null);
+  const [analysisError, setAnalysisError] = useState<unknown>(null);
+
+  const createPub = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+    try {
+      await apiPost('/api/publications', {
+        processId: data.id,
+        source: form.source,
+        content: form.content,
+        externalReference: form.externalReference,
+        possibleDueDate: form.possibleDueDate ? new Date(form.possibleDueDate).toISOString() : null,
+        availabilityDate: form.availabilityDate ? new Date(form.availabilityDate).toISOString() : null,
+      });
+      setShowCreate(false);
+      setForm({ source: '', content: '', externalReference: '', possibleDueDate: '', availabilityDate: '' });
+      await onRefresh();
+    } catch (err) { setFormError(err); }
+  };
+
+  const analyze = async (pubId: string) => {
+    setAnalyzing(pubId);
+    setAnalysis(null);
+    setAnalysisError(null);
+    try {
+      const res = await apiPost<Record<string, unknown>>(`/api/ai/processes/${data.id}/analyze-publication/${pubId}`);
+      setAnalysis(res);
+    } catch (err) {
+      setAnalysisError(err);
+    } finally {
+      setAnalyzing(null);
+    }
+  };
+
+  const updateStatus = async (pubId: string, status: string) => {
+    try {
+      await apiPatch(`/api/publications/${pubId}`, { status });
+      await onRefresh();
+    } catch (err) { setAnalysisError(err); }
+  };
+
+  return (
+    <div>
+      <div className="mb-4 flex justify-end">
+        <Button onClick={() => setShowCreate(true)}>Registrar intimação</Button>
+      </div>
+      <ErrorAlert error={analysisError} />
+      {data.publications.length === 0 ? (
+        <EmptyState title="Nenhuma intimação registrada." hint="Registre intimações reais recebidas do tribunal." />
+      ) : (
+        <div className="space-y-3">
+          {data.publications.map((p) => (
+            <div key={String(p.id)} className="rounded-lg border border-gray-200 bg-white p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-sm font-medium">
+                    {String(p.source ?? 'Intimação')}
+                    <span className="ml-2"><Badge color={statusColor(String(p.status))}>{statusLabel(String(p.status))}</Badge></span>
+                  </div>
+                  <div className="mt-1 text-xs text-gray-400">
+                    Publicação: {formatDateTime(String(p.publication_date))} · Disponibilização: {formatDateTime(String(p.availability_date))}
+                    {Boolean(p.possible_due_date) && <span> · Prazo: <b>{formatDate(String(p.possible_due_date))}</b></span>}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={() => analyze(String(p.id))} disabled={analyzing === String(p.id)} className="px-3 py-1 text-xs">
+                    {analyzing === String(p.id) ? 'Analisando…' : 'Analisar com IA'}
+                  </Button>
+                  {p.status !== 'PROCESSED' && (
+                    <SecondaryButton onClick={() => updateStatus(String(p.id), 'PROCESSED')} className="px-3 py-1 text-xs">Marcar processada</SecondaryButton>
+                  )}
+                </div>
+              </div>
+              <p className="mt-2 whitespace-pre-wrap text-sm text-gray-700">{String(p.content)}</p>
+              {Boolean(p.external_reference) && <div className="mt-1 text-xs text-gray-400">Ref: {String(p.external_reference)}</div>}
+              {Boolean(p.notes) && <div className="mt-1 text-xs text-gray-500">Obs: {String(p.notes)}</div>}
+              {analysis && analysis.interactionId === String(p.id) && (
+                <div className="mt-3 rounded border border-blue-100 bg-blue-50 p-3 text-sm">
+                  <div className="mb-1 font-medium text-blue-800">Análise da IA (revisão humana necessária)</div>
+                  <pre className="whitespace-pre-wrap text-blue-900">{JSON.stringify((analysis.structured as Record<string, unknown>) ?? analysis.rawText ?? {}, null, 2)}</pre>
+                  <div className="mt-1 text-xs text-blue-700">{(analysis.disclaimer as string) ?? ''}</div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Registrar intimação">
+        <form onSubmit={createPub} className="space-y-3">
+          <ErrorAlert error={formError} />
+          <div>
+            <label className="mb-1 block text-sm font-medium">Origem</label>
+            <Input value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} placeholder="Ex.: DJSP, e-SAJ…" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">Data de disponibilização</label>
+            <Input type="datetime-local" value={form.availabilityDate} onChange={(e) => setForm({ ...form, availabilityDate: e.target.value })} />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">Conteúdo *</label>
+            <Textarea rows={6} value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} required />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">Referência externa</label>
+            <Input value={form.externalReference} onChange={(e) => setForm({ ...form, externalReference: e.target.value })} />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">Prazo possível</label>
+            <Input type="datetime-local" value={form.possibleDueDate} onChange={(e) => setForm({ ...form, possibleDueDate: e.target.value })} />
+          </div>
+          <Button type="submit" className="w-full">Registrar</Button>
+        </form>
+      </Modal>
+    </div>
+  );
+}
+
+function TasksTab({ data, onRefresh }: { data: ProcessDetail; onRefresh: () => Promise<void> }) {
+  const [showCreate, setShowCreate] = useState(false);
+  const [form, setForm] = useState({ title: '', description: '', priority: 'MEDIUM', dueDate: '' });
+  const [formError, setFormError] = useState<unknown>(null);
+
+  const createTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+    try {
+      await apiPost('/api/tasks', {
+        processId: data.id,
+        title: form.title,
+        description: form.description,
+        priority: form.priority,
+        dueDate: form.dueDate ? new Date(form.dueDate).toISOString() : null,
+      });
+      setShowCreate(false);
+      setForm({ title: '', description: '', priority: 'MEDIUM', dueDate: '' });
+      await onRefresh();
+    } catch (err) { setFormError(err); }
+  };
+
+  const updateStatus = async (taskId: string, status: string) => {
+    try {
+      await apiPatch(`/api/tasks/${taskId}`, { status });
+      await onRefresh();
+    } catch (err) { setFormError(err); }
+  };
+
+  return (
+    <div>
+      <div className="mb-4 flex justify-end">
+        <Button onClick={() => setShowCreate(true)}>Nova tarefa</Button>
+      </div>
+      <ErrorAlert error={formError} />
+      {data.tasks.length === 0 ? (
+        <EmptyState title="Nenhuma tarefa." hint="Crie tarefas e prazos para este processo." />
+      ) : (
+        <div className="space-y-2">
+          {data.tasks.map((t) => (
+            <div key={String(t.id)} className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3">
+              <div>
+                <div className="text-sm font-medium">{String(t.title)}</div>
+                {Boolean(t.description) && <div className="text-sm text-gray-500">{String(t.description)}</div>}
+                <div className="mt-0.5 flex gap-2 text-xs text-gray-400">
+                  <Badge color={statusColor(String(t.priority))}>{statusLabel(String(t.priority))}</Badge>
+                  <Badge color={statusColor(String(t.status))}>{statusLabel(String(t.status))}</Badge>
+                  {Boolean(t.due_date) && <span>Prazo: {formatDate(String(t.due_date))}</span>}
+                  {Boolean(t.assigned_name) && <span>· {String(t.assigned_name)}</span>}
+                </div>
+              </div>
+              {String(t.status) === 'TODO' || String(t.status) === 'IN_PROGRESS' ? (
+                <SecondaryButton onClick={() => updateStatus(String(t.id), 'DONE')} className="px-3 py-1 text-xs">Concluir</SecondaryButton>
+              ) : (
+                <button onClick={() => updateStatus(String(t.id), 'TODO')} className="text-xs text-gray-500 hover:underline">Reabrir</button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Nova tarefa">
+        <form onSubmit={createTask} className="space-y-3">
+          <ErrorAlert error={formError} />
+          <div>
+            <label className="mb-1 block text-sm font-medium">Título *</label>
+            <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium">Descrição</label>
+            <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium">Prioridade</label>
+              <Select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
+                <option value="LOW">Baixa</option>
+                <option value="MEDIUM">Média</option>
+                <option value="HIGH">Alta</option>
+                <option value="CRITICAL">Crítica</option>
+              </Select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Prazo</label>
+              <Input type="datetime-local" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} />
+            </div>
+          </div>
+          <Button type="submit" className="w-full">Criar</Button>
+        </form>
+      </Modal>
+    </div>
+  );
+}
+
+function AiTab({ processId, onRefresh }: { processId: string; onRefresh: () => Promise<void> }) {
+  const [aiStatus, setAiStatus] = useState<{ configured: boolean; disclaimer: string } | null>(null);
+  const [interactions, setInteractions] = useState<AiInteraction[]>([]);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [draftInstruction, setDraftInstruction] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      const [statusRes, interactionsRes] = await Promise.all([
+        apiGet<{ configured: boolean; disclaimer: string }>('/api/ai/status'),
+        apiGet<{ items: AiInteraction[] }>(`/api/ai/interactions?processId=${processId}`),
+      ]);
+      setAiStatus(statusRes);
+      setInteractions(interactionsRes.items);
+    } catch (e) { setError(e); }
+  }, [processId]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const run = async (kind: string, action: () => Promise<void>) => {
+    setError(null);
+    setBusy(kind);
+    try {
+      await action();
+      await load();
+      await onRefresh();
+    } catch (e) { setError(e); }
+    finally { setBusy(null); }
+  };
+
+  const review = async (interactionId: string, status: string) => {
+    setError(null);
+    try {
+      await apiPost(`/api/ai/interactions/${interactionId}/review`, { status });
+      await load();
+      await onRefresh();
+    } catch (e) { setError(e); }
+  };
+
+  if (!aiStatus) return <div className="text-gray-500">Carregando…</div>;
+
+  return (
+    <div className="space-y-6">
+      <Card title="IA contextual ao processo">
+        <div className="mb-4 rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+          {aiStatus.disclaimer}
+        </div>
+        {!aiStatus.configured && (
+          <div className="rounded-md border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
+            Serviço de IA não configurado. Defina OPENAI_API_KEY no ambiente ou ative AI_PROVIDER=local para usar o provedor offline.
+          </div>
+        )}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Button
+            disabled={!aiStatus.configured || busy !== null}
+            onClick={() => run('summarize', async () => { await apiPost(`/api/ai/processes/${processId}/summarize`); })}
+          >
+            {busy === 'summarize' ? 'Resumindo…' : 'Resumir processo'}
+          </Button>
+          <div className="flex gap-2">
+            <Input placeholder="Instrução para rascunho…" value={draftInstruction} onChange={(e) => setDraftInstruction(e.target.value)} />
+            <Button
+              disabled={!aiStatus.configured || busy !== null || !draftInstruction.trim()}
+              onClick={() => run('draft', async () => { await apiPost(`/api/ai/processes/${processId}/draft`, { instruction: draftInstruction }); })}
+              className="shrink-0"
+            >
+              {busy === 'draft' ? 'Gerando…' : 'Gerar rascunho'}
+            </Button>
+          </div>
+        </div>
+        <ErrorAlert error={error} />
+      </Card>
+
+      <Card title="Histórico de interações de IA">
+        {interactions.length === 0 ? (
+          <EmptyState title="Nenhuma execução de IA registrada." />
+        ) : (
+          <div className="space-y-3">
+            {interactions.map((i) => {
+              const lastApproval = i.approvals?.[i.approvals.length - 1];
+              return (
+                <div key={i.id} className="rounded-lg border border-gray-200 p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-medium">
+                      {statusLabel(String(i.type))}
+                      <span className="ml-2 text-xs text-gray-400">{i.model ?? ''}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {lastApproval ? (
+                        <Badge color={statusColor(lastApproval.status)}>{statusLabel(lastApproval.status)}</Badge>
+                      ) : (
+                        <Badge color="yellow">Pendente revisão</Badge>
+                      )}
+                      <span className="text-xs text-gray-400">{formatDateTime(i.created_at)}</span>
+                    </div>
+                  </div>
+                  {i.output?.structured && (
+                    <pre className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap rounded bg-gray-50 p-3 text-xs text-gray-700">
+                      {JSON.stringify(i.output.structured, null, 2)}
+                    </pre>
+                  )}
+                  {!i.output?.structured && i.output?.rawText && (
+                    <pre className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap rounded bg-gray-50 p-3 text-xs text-gray-700">{i.output.rawText}</pre>
+                  )}
+                  {!lastApproval && (
+                    <div className="mt-3 flex gap-2">
+                      <SecondaryButton onClick={() => review(i.id, 'APPROVED')} className="px-3 py-1 text-xs">Aprovar</SecondaryButton>
+                      <SecondaryButton onClick={() => review(i.id, 'REJECTED')} className="px-3 py-1 text-xs text-red-600">Rejeitar</SecondaryButton>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+function AuditTab({ processId }: { processId: string }) {
+  const [logs, setLogs] = useState<Array<Record<string, unknown>>>([]);
+  const [error, setError] = useState<unknown>(null);
+
+  useEffect(() => {
+    apiGet<{ items: Array<Record<string, unknown>> }>(`/api/audit?entity=case&entityId=${processId}`)
+      .then((r) => setLogs(r.items))
+      .catch(setError);
+  }, [processId]);
+
+  if (error) return <ErrorAlert error={error} />;
+  if (logs.length === 0) return <EmptyState title="Nenhum log de auditoria para este processo." />;
+
+  return (
+    <div className="overflow-x-auto rounded-lg border border-gray-200">
+      <table className="min-w-full divide-y divide-gray-200 text-sm">
+        <thead className="bg-gray-50">
+          <tr>
+            <th className="px-4 py-2 text-left font-medium text-gray-500">Data</th>
+            <th className="px-4 py-2 text-left font-medium text-gray-500">Ação</th>
+            <th className="px-4 py-2 text-left font-medium text-gray-500">Usuário</th>
+            <th className="px-4 py-2 text-left font-medium text-gray-500">Detalhes</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {logs.map((l) => (
+            <tr key={String(l.id)}>
+              <td className="px-4 py-2 text-gray-500">{formatDateTime(String(l.created_at))}</td>
+              <td className="px-4 py-2 font-medium">{String(l.action)}</td>
+              <td className="px-4 py-2 text-gray-500">{String(l.user_name ?? '')}</td>
+              <td className="px-4 py-2 text-xs text-gray-400">
+                {l.after ? <pre className="whitespace-pre-wrap">{JSON.stringify(l.after).slice(0, 120)}</pre> : ''}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
