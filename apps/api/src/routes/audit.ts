@@ -1,12 +1,13 @@
 import { Router } from 'express';
-import { requireAuth, requireOrg, getOrgId } from '../auth/middleware';
+import { requireAuth, requireOrg, getOrgId, requirePermission } from '../auth/middleware';
+import { PERMISSIONS } from '@advogado/shared';
 import { listAuditLogs } from '../audit/audit';
 
 const router = Router();
 
 router.use(requireAuth, requireOrg);
 
-router.get('/', async (req, res, next) => {
+router.get('/', requirePermission(PERMISSIONS.AUDIT_READ), async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
     const result = await listAuditLogs(orgId, {

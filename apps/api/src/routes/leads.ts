@@ -1,13 +1,14 @@
 import { Router } from 'express';
 import { createLeadSchema, updateLeadSchema, convertLeadSchema } from '@advogado/shared';
-import { requireAuth, requireOrg, getOrgId } from '../auth/middleware';
+import { PERMISSIONS } from '@advogado/shared';
+import { requireAuth, requireOrg, getOrgId, requirePermission } from '../auth/middleware';
 import * as leadService from '../services/leadService';
 
 const router = Router();
 
 router.use(requireAuth, requireOrg);
 
-router.get('/', async (req, res, next) => {
+router.get('/', requirePermission(PERMISSIONS.LEADS_READ), async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
     const result = await leadService.listLeads(orgId, {
@@ -20,7 +21,7 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/', async (req, res, next) => {
+router.post('/', requirePermission(PERMISSIONS.LEADS_CREATE), async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
     const data = createLeadSchema.parse(req.body);

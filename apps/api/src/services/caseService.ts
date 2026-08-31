@@ -80,7 +80,7 @@ export async function updateCase(organizationId: string, caseId: string, input: 
        area = COALESCE($7, area),
        description = $8,
        status = COALESCE($9, status),
-       responsible_id = $10,
+       responsible_id = COALESCE($10, responsible_id),
        updated_at = now()
      WHERE id = $1 AND organization_id = $11 RETURNING *`,
     [
@@ -135,21 +135,18 @@ export interface CaseAccess {
 
 /**
  * Resolve o nível de acesso granular de um usuário a um processo.
- * - ADMIN da organização tem acesso total (manage).
+ * - ADMIN da organização NÃO recebe acesso jurídico automático por role;
+ *   deve ser responsável ou membro do processo (ROLE + PERMISSION + SCOPE).
  * - Responsável pelo processo tem edit (não gerencia membros por padrão).
  * - Membros do processo (case_members) seguem as permissões can_view/can_edit/can_manage.
  */
-export async function getCaseAccess(organizationId: string, caseId: string, userId: string, orgRole?: string | null): Promise<CaseAccess> {
+export async function getCaseAccess(organizationId: string, caseId: string, userId: string, _orgRole?: string | null): Promise<CaseAccess> {
   const pool = getPool();
   const caseRes = await pool.query(
     `SELECT c.id, c.responsible_id FROM cases c WHERE c.id = $1 AND c.organization_id = $2`,
     [caseId, organizationId],
   );
   if (caseRes.rows.length === 0) throw errors.notFound('Processo não encontrado.');
-
-  if (orgRole === 'ADMIN') {
-    return { level: 'manage', memberId: null, role: 'ADMIN' };
-  }
 
   const memberRes = await pool.query(
     `SELECT id, role, can_view, can_edit, can_manage FROM case_members WHERE case_id = $1 AND user_id = $2`,
@@ -196,11 +193,14 @@ export async function assertCaseAccess(organizationId: string, caseId: string): 
 
 export async function listCases(
   organizationId: string,
+  userId: string,
   opts: { search?: string; status?: string; clientId?: string; area?: string; sort?: string; page?: number; pageSize?: number },
 ) {
   const pool = getPool();
-  const params: unknown[] = [organizationId];
-  let where = 'c.organization_id = $1';
+  const params: unknown[] = [organizationId, userId];
+  let where = `c.organization_id = $1
+    AND (c.responsible_id = $2
+         OR EXISTS (SELECT 1 FROM case_members cm WHERE cm.case_id = c.id AND cm.user_id = $2 AND cm.can_view))`;
   if (opts.status) {
     params.push(opts.status);
     where += ` AND c.status = $${params.length}`;
@@ -288,8 +288,10 @@ export async function addCaseMember(organizationId: string, caseId: string, user
     [organizationId, userId],
   );
   if (memberOk.rows.length === 0) throw errors.validation('Usuário não pertence à organização.');
-  const canView = true;
-  const canEdit = role !== 'ASSISTANT';
+  // FINANCE e ASSISTANT não recebem acesso jurídico amplo automaticamente;
+  // permissões de visualização/edição são concedidas explicitamente quando necessário.
+  const canView = role !== 'FINANCE';
+  const canEdit = role !== 'ASSISTANT' && role !== 'FINANCE';
   const canManage = role === 'ADMIN';
   const res = await pool.query(
     `INSERT INTO case_members (case_id, user_id, role, can_view, can_edit, can_manage)

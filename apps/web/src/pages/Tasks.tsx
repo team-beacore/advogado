@@ -84,27 +84,27 @@ export default function Tasks() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Tarefas</h1>
+      <div className="mb-7 flex flex-wrap items-end justify-between gap-3 border-b border-gray-200/80 pb-5">
+        <h1 className="page-title">Tarefas</h1>
         <Button onClick={() => setShowCreate(true)}>Nova tarefa</Button>
       </div>
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-lg border border-gray-200 bg-white p-3 text-center">
           <div className="text-xs text-gray-500">Hoje</div>
-          <div className="text-xl font-bold">{summary?.today ?? '—'}</div>
+          <div className="font-display text-2xl font-semibold text-gray-900">{summary?.today ?? '—'}</div>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-3 text-center">
           <div className="text-xs text-gray-500">Atrasadas</div>
-          <div className="text-xl font-bold text-red-600">{summary?.overdue ?? '—'}</div>
+          <div className="font-display text-2xl font-semibold text-danger-600">{summary?.overdue ?? '—'}</div>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-3 text-center">
           <div className="text-xs text-gray-500">Próximas</div>
-          <div className="text-xl font-bold">{summary?.upcoming ?? '—'}</div>
+          <div className="font-display text-2xl font-semibold text-gray-900">{summary?.upcoming ?? '—'}</div>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-3 text-center">
           <div className="text-xs text-gray-500">Concluídas</div>
-          <div className="text-xl font-bold text-green-600">{summary?.done ?? '—'}</div>
+          <div className="font-display text-2xl font-semibold text-success-600">{summary?.done ?? '—'}</div>
         </div>
       </div>
 
@@ -113,7 +113,7 @@ export default function Tasks() {
           <button
             key={v.key}
             onClick={() => setView(v.key)}
-            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${view === v.key ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-800'}`}
+            className={`-mb-px whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors ${view === v.key ? 'border-brand-700 text-brand-800' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-800'}`}
           >
             {v.label}
           </button>
@@ -123,7 +123,7 @@ export default function Tasks() {
       <ErrorAlert error={error} />
 
       {loading ? (
-        <div className="text-gray-500">Carregando…</div>
+        <div className="flex items-center gap-2.5 text-sm text-gray-500"><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-200 border-t-brand-600" />Carregando…</div>
       ) : items.length === 0 ? (
         <EmptyState title="Nenhuma tarefa nesta visão." />
       ) : (
@@ -131,22 +131,22 @@ export default function Tasks() {
           {items.map((t) => (
             <div key={t.id} className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3">
               <div>
-                <div className="text-sm font-medium">{t.title}</div>
-                {t.description && <div className="text-sm text-gray-500">{t.description}</div>}
+                <div className="text-sm font-semibold text-gray-900">{t.title}</div>
+                {t.description && <div className="mt-0.5 text-sm leading-relaxed text-gray-500">{t.description}</div>}
                 <div className="mt-0.5 flex gap-2 text-xs text-gray-400">
                   <Badge color={statusColor(t.priority)}>{statusLabel(t.priority)}</Badge>
                   <Badge color={statusColor(t.status)}>{statusLabel(t.status)}</Badge>
                   {t.due_date && <span>Prazo: {formatDate(t.due_date)}</span>}
                   {t.process_title && t.process_id && (
-                    <Link to={`/processos/${t.process_id}`} className="text-brand-600 hover:underline">{t.process_title}</Link>
+                    <Link to={`/processos/${t.process_id}`} className="link-quiet">{t.process_title}</Link>
                   )}
                   {t.assigned_name && <span>· {t.assigned_name}</span>}
                 </div>
               </div>
               {t.status === 'TODO' || t.status === 'IN_PROGRESS' ? (
-                <SecondaryButton onClick={() => updateStatus(t.id, 'DONE')} className="px-3 py-1 text-xs">Concluir</SecondaryButton>
+                <SecondaryButton onClick={() => updateStatus(t.id, 'DONE')} className="px-3 py-1.5 text-xs">Concluir</SecondaryButton>
               ) : (
-                <button onClick={() => updateStatus(t.id, 'TODO')} className="text-xs text-gray-500 hover:underline">Reabrir</button>
+                <button onClick={() => updateStatus(t.id, 'TODO')} className="text-xs font-medium text-gray-500 underline-offset-4 transition-colors hover:text-gray-800 hover:underline">Reabrir</button>
               )}
             </div>
           ))}
@@ -154,26 +154,26 @@ export default function Tasks() {
       )}
 
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Nova tarefa">
-        <form onSubmit={create} className="space-y-3">
+        <form onSubmit={create} className="space-y-4">
           <ErrorAlert error={formError} />
           <div>
-            <label className="mb-1 block text-sm font-medium">Título *</label>
+            <label className="field-label">Título *</label>
             <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Processo</label>
+            <label className="field-label">Processo</label>
             <Select value={form.processId} onChange={(e) => setForm({ ...form, processId: e.target.value })}>
               <option value="">Sem processo</option>
               {processes.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
             </Select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Descrição</label>
+            <label className="field-label">Descrição</label>
             <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium">Prioridade</label>
+              <label className="field-label">Prioridade</label>
               <Select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
                 <option value="LOW">Baixa</option>
                 <option value="MEDIUM">Média</option>
@@ -182,7 +182,7 @@ export default function Tasks() {
               </Select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Prazo</label>
+              <label className="field-label">Prazo</label>
               <Input type="datetime-local" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} />
             </div>
           </div>

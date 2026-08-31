@@ -89,8 +89,8 @@ export default function Publications() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Intimações</h1>
+      <div className="mb-7 flex flex-wrap items-end justify-between gap-3 border-b border-gray-200/80 pb-5">
+        <h1 className="page-title">Intimações</h1>
         <div className="flex gap-2">
           {captureStatus.some((a) => a.configured) && (
             <SecondaryButton onClick={runCapture} disabled={capturing} className="shrink-0">
@@ -108,7 +108,7 @@ export default function Publications() {
       )}
 
       <div className="mb-4">
-        <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="max-w-44">
+        <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="sm:max-w-48">
           <option value="">Todas</option>
           <option value="PENDING">Pendentes</option>
           <option value="READ">Lidas</option>
@@ -120,16 +120,16 @@ export default function Publications() {
       <ErrorAlert error={error} />
 
       {loading ? (
-        <div className="text-gray-500">Carregando…</div>
+        <div className="flex items-center gap-2.5 text-sm text-gray-500"><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-200 border-t-brand-600" />Carregando…</div>
       ) : items.length === 0 ? (
         <EmptyState title="Nenhuma intimação registrada." hint="Registre intimações reais recebidas dos tribunais." />
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {items.map((p) => (
-            <div key={p.id} className="rounded-lg border border-gray-200 bg-white p-4">
+            <div key={p.id} className="surface p-4">
               <div className="flex items-start justify-between">
                 <div>
-                  <div className="text-sm font-medium">
+                  <div className="text-sm font-semibold text-gray-900">
                     {p.source ?? 'Intimação'}
                     <span className="ml-2"><Badge color={statusColor(p.status)}>{statusLabel(p.status)}</Badge></span>
                   </div>
@@ -139,13 +139,13 @@ export default function Publications() {
                     {p.possible_due_date && <span> · Prazo: <b>{formatDateTime(p.possible_due_date)}</b></span>}
                   </div>
                   {p.process_title && p.process_id && (
-                    <Link to={`/processos/${p.process_id}`} className="mt-1 inline-block text-sm text-brand-600 hover:underline">
+                    <Link to={`/processos/${p.process_id}`} className="mt-1 inline-block text-sm link-quiet">
                       {p.process_title}
                     </Link>
                   )}
                 </div>
                 {p.status === 'PENDING' && (
-                  <SecondaryButton onClick={() => updateStatus(p.id, 'PROCESSED')} className="px-3 py-1 text-xs">Marcar processada</SecondaryButton>
+                  <SecondaryButton onClick={() => updateStatus(p.id, 'PROCESSED')} className="px-3 py-1.5 text-xs">Marcar processada</SecondaryButton>
                 )}
               </div>
               <p className="mt-2 whitespace-pre-wrap text-sm text-gray-700">{p.content}</p>
@@ -157,33 +157,33 @@ export default function Publications() {
       )}
 
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Registrar intimação">
-        <form onSubmit={create} className="space-y-3">
+        <form onSubmit={create} className="space-y-4">
           <ErrorAlert error={formError} />
           <div>
-            <label className="mb-1 block text-sm font-medium">Processo *</label>
+            <label className="field-label">Processo *</label>
             <Select value={form.processId} onChange={(e) => setForm({ ...form, processId: e.target.value })} required>
               <option value="">Selecione…</option>
               {processes.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
             </Select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Origem</label>
+            <label className="field-label">Origem</label>
             <Input value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} placeholder="Ex.: DJSP, e-SAJ…" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Data de disponibilização</label>
+            <label className="field-label">Data de disponibilização</label>
             <Input type="datetime-local" value={form.availabilityDate} onChange={(e) => setForm({ ...form, availabilityDate: e.target.value })} />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Conteúdo *</label>
+            <label className="field-label">Conteúdo *</label>
             <Textarea rows={6} value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} required />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Referência externa</label>
+            <label className="field-label">Referência externa</label>
             <Input value={form.externalReference} onChange={(e) => setForm({ ...form, externalReference: e.target.value })} />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Prazo possível</label>
+            <label className="field-label">Prazo possível</label>
             <Input type="datetime-local" value={form.possibleDueDate} onChange={(e) => setForm({ ...form, possibleDueDate: e.target.value })} />
           </div>
           <Button type="submit" className="w-full">Registrar</Button>

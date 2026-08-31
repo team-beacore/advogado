@@ -1,6 +1,7 @@
 import { Router } from 'express';
-import { createOrganizationSchema } from '@advogado/shared';
-import { requireAuth, requireOrg, getOrgId, requireRole } from '../auth/middleware';
+import { createOrganizationSchema, addMemberByEmailSchema } from '@advogado/shared';
+import { requireAuth, requireOrg, getOrgId, requirePermission, requirePlan } from '../auth/middleware';
+import { PERMISSIONS } from '@advogado/shared';
 import * as orgService from '../services/orgService';
 
 const router = Router();
@@ -18,8 +19,6 @@ router.post('/', async (req, res, next) => {
   try {
     const data = createOrganizationSchema.parse(req.body);
     const org = await orgService.createOrganization(data.name, req.user!.id, req.ip);
-    // Set session org to this new org
-    // (the user will need to switch orgs; for now the next login sets it)
     res.status(201).json(org);
   } catch (err: unknown) {
     if (err && typeof err === 'object' && 'issues' in err) {
@@ -39,19 +38,25 @@ router.get('/current', requireOrg, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.get('/:orgId/members', async (req, res, next) => {
+router.get('/members', requireOrg, async (req, res, next) => {
   try {
-    const members = await orgService.listOrganizationUsers(req.params.orgId!);
+    const orgId = getOrgId(req);
+    const members = await orgService.listOrganizationUsers(orgId);
     res.json(members);
   } catch (err) { next(err); }
 });
 
-router.post('/:orgId/members', requireRole('ADMIN'), async (req, res, next) => {
+router.post('/members', requireOrg, requirePlan('OFFICE'), requirePermission(PERMISSIONS.TEAM_MANAGE), async (req, res, next) => {
   try {
-    const { email, role } = req.body;
-    const result = await orgService.addOrganizationUser(req.params.orgId!, email, role ?? 'LAWYER', req.user!.id, req.ip);
+    const orgId = getOrgId(req);
+    const data = addMemberByEmailSchema.parse(req.body);
+    const result = await orgService.addOrganizationUser(orgId, data.email, data.role, req.user!.id, req.ip, data.name);
     res.status(201).json(result);
   } catch (err: unknown) {
+    if (err && typeof err === 'object' && 'issues' in err) {
+      res.status(400).json({ code: 'VALIDATION', message: 'Dados inválidos.', details: (err as { issues: unknown }).issues });
+      return;
+    }
     if (err && typeof err === 'object' && 'message' in err) {
       const status = (err as { status?: number }).status ?? 500;
       res.status(status).json({ code: 'ERROR', message: (err as Error).message });
@@ -61,9 +66,18 @@ router.post('/:orgId/members', requireRole('ADMIN'), async (req, res, next) => {
   }
 });
 
-router.patch('/:orgId/members/:userId', requireRole('ADMIN'), async (req, res, next) => {
+router.patch('/members/:userId', requireOrg, requirePlan('OFFICE'), requirePermission(PERMISSIONS.TEAM_MANAGE), async (req, res, next) => {
   try {
-    const result = await orgService.updateMemberRole(req.params.orgId!, req.params.userId!, req.body.role, req.user!.id, req.ip);
+    const orgId = getOrgId(req);
+    const result = await orgService.updateMemberRole(orgId, req.params.userId!, req.body.role, req.user!.id, req.ip);
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
+router.delete('/members/:userId', requireOrg, requirePlan('OFFICE'), requirePermission(PERMISSIONS.TEAM_MANAGE), async (req, res, next) => {
+  try {
+    const orgId = getOrgId(req);
+    const result = await orgService.removeOrganizationUser(orgId, req.params.userId!, req.user!.id, req.ip);
     res.json(result);
   } catch (err) { next(err); }
 });

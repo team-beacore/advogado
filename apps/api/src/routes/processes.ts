@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { createCaseSchema, updateCaseSchema, listCasesQuerySchema, addMemberSchema, createEventSchema, updateCaseMemberPermissionsSchema } from '@advogado/shared';
-import { requireAuth, requireOrg, getOrgId } from '../auth/middleware';
+import { requireAuth, requireOrg, getOrgId, requirePermission } from '../auth/middleware';
+import { PERMISSIONS } from '@advogado/shared';
 import * as caseService from '../services/caseService';
 import { addEvent, listEvents } from '../events/timeline';
 import { auditLog } from '../audit/audit';
@@ -14,11 +15,11 @@ async function assertPermission(req: Parameters<typeof getOrgId>[0], caseId: str
   await caseService.assertCasePermission(orgId, caseId, req.user!.id, required, req.user!.role);
 }
 
-router.get('/', async (req, res, next) => {
+router.get('/', requirePermission(PERMISSIONS.PROCESSES_READ), async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
     const q = listCasesQuerySchema.parse(req.query);
-    const result = await caseService.listCases(orgId, {
+    const result = await caseService.listCases(orgId, req.user!.id, {
       search: q.search,
       status: q.status,
       clientId: q.clientId,
@@ -37,7 +38,7 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-router.post('/', async (req, res, next) => {
+router.post('/', requirePermission(PERMISSIONS.PROCESSES_CREATE), async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
     const data = createCaseSchema.parse(req.body);

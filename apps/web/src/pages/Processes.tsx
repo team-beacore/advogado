@@ -75,20 +75,20 @@ export default function Processes() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Processos</h1>
+      <div className="mb-7 flex flex-wrap items-end justify-between gap-3 border-b border-gray-200/80 pb-5">
+        <h1 className="page-title">Processos</h1>
         <Button onClick={() => setShowCreate(true)}>Novo Processo</Button>
       </div>
 
-      <div className="mb-4 flex gap-3">
+      <div className="mb-5 flex flex-col gap-3 rounded-xl border border-gray-200/90 bg-white p-3 shadow-card sm:flex-row sm:items-center">
         <Input
           placeholder="Buscar por título ou número…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && void load()}
-          className="max-w-sm"
+          className="sm:max-w-sm"
         />
-        <Select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} className="max-w-40">
+        <Select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} className="sm:max-w-44">
           <option value="">Todos</option>
           <option value="ACTIVE">Ativo</option>
           <option value="SUSPENDED">Suspenso</option>
@@ -101,7 +101,7 @@ export default function Processes() {
       <ErrorAlert error={error} />
 
       {loading ? (
-        <div className="text-gray-500">Carregando…</div>
+        <div className="flex items-center gap-2.5 text-sm text-gray-500"><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-200 border-t-brand-600" />Carregando…</div>
       ) : items.length === 0 ? (
         <EmptyState title="Nenhum processo encontrado." hint="Crie seu primeiro processo." />
       ) : (
@@ -111,29 +111,29 @@ export default function Processes() {
               <Link
                 key={p.id}
                 to={`/processos/${p.id}`}
-                className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm hover:border-brand-300"
+                className="group surface p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-elevated"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div className="font-medium">{p.title}</div>
+                  <div className="font-display text-[0.95rem] font-semibold leading-snug tracking-tight text-gray-900">{p.title}</div>
                   <Badge color={statusColor(p.status)}>{statusLabel(p.status)}</Badge>
                 </div>
                 {p.process_number && <div className="mt-1 text-xs text-gray-500">{p.process_number}</div>}
                 {p.client_name && <div className="mt-1 text-sm text-gray-600">{p.client_name}</div>}
-                <div className="mt-2 flex gap-3 text-xs text-gray-400">
+                <div className="mt-3.5 flex flex-wrap gap-3 border-t border-gray-100 pt-3 text-xs font-medium text-gray-400">
                   <span>{p.document_count} docs</span>
                   <span>{p.open_task_count} tarefas</span>
-                  {p.pending_publication_count > 0 && <span className="text-yellow-600">{p.pending_publication_count} intimações</span>}
+                  {p.pending_publication_count > 0 && <span className="text-warning-600">{p.pending_publication_count} intimações</span>}
                 </div>
               </Link>
             ))}
           </div>
           {total > 20 && (
-            <div className="mt-4 flex items-center justify-between text-sm text-gray-500">
+            <div className="mt-6 flex items-center justify-between gap-3 rounded-xl border border-gray-200/90 bg-white px-4 py-3 text-sm text-gray-500 shadow-card">
               <span>{total} processo(s)</span>
               <div className="flex gap-2">
-                <button disabled={page <= 1} onClick={() => setPage(page - 1)} className="disabled:opacity-30">Anterior</button>
+                <button disabled={page <= 1} onClick={() => setPage(page - 1)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:pointer-events-none disabled:opacity-35">Anterior</button>
                 <span>{page}</span>
-                <button disabled={page * 20 >= total} onClick={() => setPage(page + 1)} className="disabled:opacity-30">Próxima</button>
+                <button disabled={page * 20 >= total} onClick={() => setPage(page + 1)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:pointer-events-none disabled:opacity-35">Próxima</button>
               </div>
             </div>
           )}
@@ -141,35 +141,35 @@ export default function Processes() {
       )}
 
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Novo Processo">
-        <form onSubmit={handleCreate} className="space-y-3">
+        <form onSubmit={handleCreate} className="space-y-4">
           <ErrorAlert error={formError} />
           <div>
-            <label className="mb-1 block text-sm font-medium">Cliente</label>
+            <label className="field-label">Cliente</label>
             <Select value={form.clientId} onChange={(e) => setForm({ ...form, clientId: e.target.value })}>
               <option value="">Sem cliente</option>
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </Select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Título *</label>
+            <label className="field-label">Título *</label>
             <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Número do processo</label>
+            <label className="field-label">Número do processo</label>
             <Input value={form.processNumber} onChange={(e) => setForm({ ...form, processNumber: e.target.value })} placeholder="Ex.: 1234567-89.2024.8.01.0001" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium">Tribunal</label>
+              <label className="field-label">Tribunal</label>
               <Input value={form.court} onChange={(e) => setForm({ ...form, court: e.target.value })} />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Área</label>
+              <label className="field-label">Área</label>
               <Input value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} />
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Descrição</label>
+            <label className="field-label">Descrição</label>
             <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           </div>
           <Button type="submit" className="w-full">Criar</Button>

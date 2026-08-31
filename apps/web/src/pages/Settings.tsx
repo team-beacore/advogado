@@ -1,16 +1,23 @@
 import { useCallback, useEffect, useState } from 'react';
-import { apiGet, apiPut, apiDelete } from '../api/client';
+import { apiGet, apiPut, apiPost, apiPatch } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
-import { Card, Badge, EmptyState, ErrorAlert, Button, SecondaryButton, Input, Modal } from '../components/ui';
+import { Card, Badge, EmptyState, ErrorAlert, Button, Input } from '../components/ui';
 
 interface SecurityReport {
-  organization: { id: string; name: string; created_at: string } | null;
+  organization: { id: string; name: string; plan_type?: string | null; created_at: string } | null;
   currentUserId: string;
   users: Array<{ id: string; name: string; email: string; role: string; created_at: string }>;
   storage: { driver: string; totalBytes: number; documentCount: number };
   counts: { clients: number; cases: number; leads: number; aiInteractions: number; auditLogs: number };
   ai: { configured: boolean; provider: string | null; model: string | null; baseUrl: string | null; disclaimer: string };
   integrations: Record<string, unknown>;
+}
+
+interface UserNotificationPrefs {
+  emailEnabled: boolean;
+  newPublication: boolean;
+  deadlineAlert: boolean;
+  paymentAlert: boolean;
 }
 
 interface CaptureConfigRow {
@@ -36,98 +43,154 @@ export default function Settings() {
   const [captureConfigs, setCaptureConfigs] = useState<CaptureConfigRow[]>([]);
   const [channelStatus, setChannelStatus] = useState<ChannelStatus[]>([]);
   const [error, setError] = useState<unknown>(null);
+  const [phone, setPhone] = useState(user?.phone ?? '');
+  const [prefs, setPrefs] = useState<UserNotificationPrefs | null>(null);
+  const [profileError, setProfileError] = useState<unknown>(null);
+  const [profileSaving, setProfileSaving] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [r, cc, cs] = await Promise.all([
+      const [r, cc, cs, p] = await Promise.all([
         apiGet<SecurityReport>('/api/settings/security'),
         apiGet<CaptureConfigRow[]>('/api/capture/config').catch(() => []),
         apiGet<ChannelStatus[]>('/api/notifications/channels/status').catch(() => []),
+        apiGet<UserNotificationPrefs>('/api/notifications/preferences').catch(() => null),
       ]);
       setReport(r);
       setCaptureConfigs(cc);
       setChannelStatus(cs);
+      setPrefs(p);
+      setPhone(user?.phone ?? '');
     } catch (e) { setError(e); }
-  }, []);
+  }, [user?.phone]);
 
   useEffect(() => { void load(); }, [load]);
 
-  const [editingCapture, setEditingCapture] = useState<CaptureConfigRow | null>(null);
-  const [captureForm, setCaptureForm] = useState({ enabled: true, login: '', password: '', baseUrl: '' });
-  const [captureFormError, setCaptureFormError] = useState<unknown>(null);
-
-  const openCaptureEdit = (row: CaptureConfigRow) => {
-    setCaptureForm({ enabled: row.enabled, login: row.login ?? '', password: '', baseUrl: row.baseUrl ?? '' });
-    setEditingCapture(row);
-    setCaptureFormError(null);
-  };
-
-  const saveCapture = async (e: React.FormEvent) => {
+  const saveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingCapture) return;
-    setCaptureFormError(null);
+    setProfileError(null);
+    setProfileSaving(true);
     try {
-      await apiPut('/api/capture/config', {
-        adapter: editingCapture.adapter,
-        enabled: captureForm.enabled,
-        login: captureForm.login || editingCapture.login,
-        password: captureForm.password || 'placeholder',
-        baseUrl: captureForm.baseUrl || null,
-      });
-      setEditingCapture(null);
-      void load();
-    } catch (err) { setCaptureFormError(err); }
+      const res = await apiPatch<{ user: { phone: string | null } }>('/api/auth/me', { phone });
+      setPhone(res.user.phone ?? '');
+    } catch (err) { setProfileError(err); }
+    finally { setProfileSaving(false); }
   };
 
-  const deleteCapture = async (adapter: string) => {
-    if (!confirm(`Remover configuração do adapter ${adapter}?`)) return;
+  const savePrefs = async (next: Partial<UserNotificationPrefs>) => {
+    setProfileError(null);
     try {
-      await apiDelete(`/api/capture/config/${adapter}`);
+      const saved = await apiPut<UserNotificationPrefs>('/api/notifications/preferences', next);
+      setPrefs(saved);
+    } catch (err) { setProfileError(err); }
+  };
+
+  // Senha
+  const [pw, setPw] = useState({ current: '', next: '', confirm: '' });
+  const [pwError, setPwError] = useState<unknown>(null);
+  const [pwMsg, setPwMsg] = useState('');
+  const [pwSaving, setPwSaving] = useState(false);
+
+  const changePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwError(null); setPwMsg('');
+    if (pw.next !== pw.confirm) { setPwError(new Error('As senhas novas não conferem.')); return; }
+    setPwSaving(true);
+    try {
+      await apiPost('/api/auth/change-password', { currentPassword: pw.current, newPassword: pw.next });
+      setPw({ current: '', next: '', confirm: '' });
+      setPwMsg('✅ Senha alterada com sucesso.');
+    } catch (err) { setPwError(err); }
+    finally { setPwSaving(false); }
+  };
+
+  // Canais — apenas ativar/desativar
+  const toggleChannel = async (channel: string, enabled: boolean) => {
+    setError(null);
+    try {
+      await apiPut('/api/notifications/channels', { channel, enabled });
       void load();
     } catch (err) { setError(err); }
   };
 
-  const [editingChannel, setEditingChannel] = useState<ChannelStatus | null>(null);
-  const [channelForm, setChannelForm] = useState({ enabled: true, host: '', port: '587', user: '', pass: '', from: '', apiUrl: '', apiToken: '' });
-  const [channelFormError, setChannelFormError] = useState<unknown>(null);
-
-  const openChannelEdit = (row: ChannelStatus) => {
-    setChannelForm({ enabled: row.enabled, host: '', port: '587', user: '', pass: '', from: '', apiUrl: '', apiToken: '' });
-    setEditingChannel(row);
-    setChannelFormError(null);
-  };
-
-  const saveChannel = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingChannel) return;
-    setChannelFormError(null);
-    const config: Record<string, unknown> = {};
-    if (editingChannel.channel === 'EMAIL') {
-      if (channelForm.host) { config.host = channelForm.host; config.port = Number(channelForm.port) || 587; config.user = channelForm.user; config.pass = channelForm.pass; config.from = channelForm.from; }
-    } else {
-      if (channelForm.apiUrl) { config.apiUrl = channelForm.apiUrl; config.apiToken = channelForm.apiToken; }
-    }
-    if (Object.keys(config).length === 0) { setChannelFormError(new Error('Preencha ao menos um campo.')); return; }
+  // Captura — apenas ativar/desativar
+  const toggleCapture = async (adapter: string, enabled: boolean) => {
+    setError(null);
     try {
-      await apiPut('/api/notifications/channels', { channel: editingChannel.channel, enabled: channelForm.enabled, config });
-      setEditingChannel(null);
+      await apiPut('/api/capture/config', { adapter, enabled });
       void load();
-    } catch (err) { setChannelFormError(err); }
+    } catch (err) { setError(err); }
   };
 
-  if (!report) return <div className="text-gray-500">Carregando…</div>;
+  if (!report) return <div className="flex items-center gap-2.5 text-sm text-gray-500"><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-200 border-t-brand-600" />Carregando…</div>;
 
   return (
     <div>
-      <h1 className="mb-6 text-xl font-semibold">Configurações</h1>
+      <h1 className="page-title mb-6">Configurações</h1>
       <ErrorAlert error={error} />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* Perfil e preferências do usuário */}
+        <Card title="Meu perfil e notificações">
+          <form onSubmit={saveProfile} className="space-y-4">
+            <ErrorAlert error={profileError} />
+            <div>
+              <label className="field-label">Telefone do advogado</label>
+              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(21) 99999-9999" />
+              <p className="mt-1 text-xs text-gray-500">Telefone de contato do usuário.</p>
+            </div>
+            <Button type="submit" disabled={profileSaving} className="w-full">{profileSaving ? 'Salvando…' : 'Salvar telefone'}</Button>
+          </form>
+          {prefs && (
+            <div className="mt-5 space-y-3 border-t border-gray-100 pt-4">
+              <div className="text-sm font-semibold text-gray-800">Preferências</div>
+              <label className="flex items-center justify-between text-sm">
+                <span>Receber e-mail</span>
+                <input type="checkbox" checked={prefs.emailEnabled} onChange={(e) => void savePrefs({ emailEnabled: e.target.checked })} />
+              </label>
+              <label className="flex items-center justify-between text-sm">
+                <span>Nova intimação</span>
+                <input type="checkbox" checked={prefs.newPublication} onChange={(e) => void savePrefs({ newPublication: e.target.checked })} />
+              </label>
+              <label className="flex items-center justify-between text-sm">
+                <span>Alertas de prazo</span>
+                <input type="checkbox" checked={prefs.deadlineAlert} onChange={(e) => void savePrefs({ deadlineAlert: e.target.checked })} />
+              </label>
+              <label className="flex items-center justify-between text-sm">
+                <span>Alertas de cobrança</span>
+                <input type="checkbox" checked={prefs.paymentAlert} onChange={(e) => void savePrefs({ paymentAlert: e.target.checked })} />
+              </label>
+            </div>
+          )}
+        </Card>
+
+        {/* Segurança */}
+        <Card title="Segurança">
+          <form onSubmit={changePassword} className="space-y-3">
+            <ErrorAlert error={pwError} />
+            {pwMsg && <div className="rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{pwMsg}</div>}
+            <div>
+              <label className="field-label">Senha atual</label>
+              <Input type="password" value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} autoComplete="current-password" required />
+            </div>
+            <div>
+              <label className="field-label">Nova senha</label>
+              <Input type="password" value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} autoComplete="new-password" required minLength={8} />
+            </div>
+            <div>
+              <label className="field-label">Confirmar nova senha</label>
+              <Input type="password" value={pw.confirm} onChange={(e) => setPw({ ...pw, confirm: e.target.value })} autoComplete="new-password" required minLength={8} />
+            </div>
+            <Button type="submit" className="w-full" disabled={pwSaving}>{pwSaving ? 'Alterando…' : 'Alterar senha'}</Button>
+          </form>
+        </Card>
+
         {/* Security Report */}
         <Card title="Privacidade e Segurança">
           <dl className="space-y-2 text-sm">
             <div className="flex justify-between"><span className="text-gray-500">Organização</span><span>{report.organization?.name ?? '—'}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Plano</span><span>{report.organization?.plan_type === 'OFFICE' ? 'Escritório' : 'Solo'}</span></div>
             <div className="flex justify-between"><span className="text-gray-500">Membros</span><span>{report.users.length}</span></div>
             <div className="flex justify-between"><span className="text-gray-500">Armazenamento</span><span>{report.storage.driver}</span></div>
             <div className="flex justify-between"><span className="text-gray-500">Documentos</span><span>{report.storage.documentCount}</span></div>
@@ -141,7 +204,7 @@ export default function Settings() {
           <dl className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-500">Status</span>
-              {report.ai.configured ? <Badge color="green">Configurado</Badge> : <span className="text-xs text-gray-400">Não configurado</span>}
+              {report.ai.configured ? <Badge color="green">Configurado</Badge> : <span className="rounded-md bg-gray-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Não configurado</span>}
             </div>
             {report.ai.configured && (
               <>
@@ -149,54 +212,62 @@ export default function Settings() {
                 <div className="flex justify-between"><span className="text-gray-500">Modelo</span><span>{report.ai.model}</span></div>
               </>
             )}
-            <div className="mt-2 rounded border border-blue-100 bg-blue-50 p-3 text-xs text-blue-700">{report.ai.disclaimer}</div>
+            <div className="mt-2 rounded-lg border border-info-100 bg-info-50 p-3.5 text-xs leading-relaxed text-info-700">{report.ai.disclaimer}</div>
           </dl>
         </Card>
 
         {isAdmin && (
           <>
-            {/* Capture config */}
-            <Card title="Captura de publicações" action={<Button className="px-3 py-1 text-xs" onClick={load}>Atualizar</Button>}>
-              <div className="space-y-3">
+            {/* Capture config — apenas ativar/desativar */}
+            <Card title="Captura de publicações" action={<Button className="px-3 py-1.5 text-xs" onClick={load}>Atualizar</Button>}>
+              <div className="space-y-4">
                 {captureConfigs.map((c) => (
                   <div key={c.adapter} className="rounded border border-gray-200 p-3">
                     <div className="flex items-center justify-between">
-                      <div className="text-sm font-medium">{c.adapter}</div>
-                      <Badge color={c.configured ? 'green' : 'gray'}>{c.configured ? 'Configurado' : 'Não configurado'}</Badge>
+                      <div className="text-sm font-semibold text-gray-900">{c.adapter}</div>
+                      <div className="flex items-center gap-2">
+                        {c.configured ? (
+                          <Badge color="green">Configurado</Badge>
+                        ) : (
+                          <Badge color="gray">Não configurado</Badge>
+                        )}
+                      </div>
                     </div>
-                    <div className="mt-1 text-xs text-gray-500">
-                      {c.login && <span className="mr-3">Login: {c.login}</span>}
-                      {c.passwordSet && <span className="mr-3">Senha: ****</span>}
-                      {c.baseUrl && <span className="block truncate">URL: {c.baseUrl}</span>}
-                    </div>
-                    <div className="mt-2 flex gap-2">
-                      <SecondaryButton onClick={() => openCaptureEdit(c)} className="px-3 py-1 text-xs">Configurar</SecondaryButton>
-                      <button onClick={() => deleteCapture(c.adapter)} className="text-xs text-red-600 hover:underline">Remover</button>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-xs text-gray-500">
+                        {c.configured ? (c.enabled ? 'Ativo' : 'Desativado') : 'Configuração feita pelo suporte técnico.'}
+                      </span>
+                      {c.configured && (
+                        <input type="checkbox" checked={c.enabled} onChange={(e) => void toggleCapture(c.adapter, e.target.checked)} />
+                      )}
                     </div>
                   </div>
                 ))}
-                {captureConfigs.length === 0 && <EmptyState title="Nenhum adapter configurado." hint="Configure um adapter para capturar intimações automaticamente." />}
+                {captureConfigs.length === 0 && <EmptyState title="Nenhum adapter disponível." />}
               </div>
             </Card>
 
-            {/* Notification channels */}
-            <Card title="Canais de notificação" action={<Button className="px-3 py-1 text-xs" onClick={load}>Atualizar</Button>}>
-              <div className="space-y-3">
+            {/* Notification channels — apenas ativar/desativar */}
+            <Card title="Canais de notificação" action={<Button className="px-3 py-1.5 text-xs" onClick={load}>Atualizar</Button>}>
+              <div className="space-y-4">
                 {channelStatus.map((ch) => (
                   <div key={ch.channel} className="rounded border border-gray-200 p-3">
                     <div className="flex items-center justify-between">
-                      <div className="text-sm font-medium">{ch.channel}</div>
-                      <div className="flex items-center gap-2">
-                        {ch.enabled && <Badge color="green">Ativo</Badge>}
-                        <Badge color={ch.configured ? 'green' : 'gray'}>{ch.configured ? 'Configurado' : 'Não configurado'}</Badge>
-                      </div>
+                      <div className="text-sm font-semibold text-gray-900">{ch.channel === 'EMAIL' ? 'E-mail' : ch.channel}</div>
+                      {ch.configured ? (
+                        <div className="flex items-center gap-2">
+                          <Badge color="green">Configurado</Badge>
+                          {ch.enabled && <Badge color="green">Ativo</Badge>}
+                          <input type="checkbox" checked={ch.enabled} onChange={(e) => void toggleChannel(ch.channel, e.target.checked)} />
+                        </div>
+                      ) : (
+                        <Badge color="gray">Não configurado</Badge>
+                      )}
                     </div>
-                    <div className="mt-2">
-                      <SecondaryButton onClick={() => openChannelEdit(ch)} className="px-3 py-1 text-xs">Configurar</SecondaryButton>
-                    </div>
+                    {!ch.configured && <div className="mt-1 text-xs text-gray-500">Ainda não foi configurado pelo suporte técnico.</div>}
                   </div>
                 ))}
-                {channelStatus.length === 0 && <EmptyState title="Nenhum canal configurado." hint="Configure email ou WhatsApp para notificações." />}
+                {channelStatus.length === 0 && <EmptyState title="Nenhum canal disponível." />}
               </div>
             </Card>
           </>
@@ -204,60 +275,10 @@ export default function Settings() {
       </div>
 
       {!isAdmin && (
-        <div className="mt-6 rounded-md border border-yellow-100 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
-          Apenas administradores da organização podem configurar integrações.
+        <div className="mt-6 rounded-lg border border-warning-100 bg-warning-50 px-4 py-3 text-sm leading-relaxed text-warning-700">
+          Apenas administradores da organização podem configurar preferências de notificação e captura.
         </div>
       )}
-
-      <Modal open={Boolean(editingCapture)} onClose={() => setEditingCapture(null)} title={`Configurar captura — ${editingCapture?.adapter ?? ''}`}>
-        <form onSubmit={saveCapture} className="space-y-3">
-          <ErrorAlert error={captureFormError} />
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={captureForm.enabled} onChange={(e) => setCaptureForm({ ...captureForm, enabled: e.target.checked })} />
-            Habilitado
-          </label>
-          <div>
-            <label className="mb-1 block text-sm font-medium">Login *</label>
-            <Input value={captureForm.login} onChange={(e) => setCaptureForm({ ...captureForm, login: e.target.value })} required placeholder={editingCapture?.login ?? ''} />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium">Senha *</label>
-            <Input type="password" value={captureForm.password} onChange={(e) => setCaptureForm({ ...captureForm, password: e.target.value })} placeholder={editingCapture?.passwordSet ? '****' : 'Nova senha'} />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium">Base URL (opcional)</label>
-            <Input value={captureForm.baseUrl} onChange={(e) => setCaptureForm({ ...captureForm, baseUrl: e.target.value })} placeholder={editingCapture?.baseUrl ?? 'URL padrão'} />
-          </div>
-          <Button type="submit" className="w-full">Salvar</Button>
-        </form>
-      </Modal>
-
-      <Modal open={Boolean(editingChannel)} onClose={() => setEditingChannel(null)} title={`Configurar canal — ${editingChannel?.channel ?? ''}`}>
-        <form onSubmit={saveChannel} className="space-y-3">
-          <ErrorAlert error={channelFormError} />
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={channelForm.enabled} onChange={(e) => setChannelForm({ ...channelForm, enabled: e.target.checked })} />
-            Habilitado
-          </label>
-          {editingChannel?.channel === 'EMAIL' ? (
-            <>
-              <div><label className="mb-1 block text-sm font-medium">SMTP Host</label><Input value={channelForm.host} onChange={(e) => setChannelForm({ ...channelForm, host: e.target.value })} placeholder="smtp.exemplo.com" /></div>
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className="mb-1 block text-sm font-medium">Porta</label><Input value={channelForm.port} onChange={(e) => setChannelForm({ ...channelForm, port: e.target.value })} /></div>
-                <div><label className="mb-1 block text-sm font-medium">Usuário</label><Input value={channelForm.user} onChange={(e) => setChannelForm({ ...channelForm, user: e.target.value })} /></div>
-              </div>
-              <div><label className="mb-1 block text-sm font-medium">Senha SMTP</label><Input type="password" value={channelForm.pass} onChange={(e) => setChannelForm({ ...channelForm, pass: e.target.value })} /></div>
-              <div><label className="mb-1 block text-sm font-medium">Remetente</label><Input value={channelForm.from} onChange={(e) => setChannelForm({ ...channelForm, from: e.target.value })} placeholder="advogado@exemplo.com" /></div>
-            </>
-          ) : (
-            <>
-              <div><label className="mb-1 block text-sm font-medium">API URL</label><Input value={channelForm.apiUrl} onChange={(e) => setChannelForm({ ...channelForm, apiUrl: e.target.value })} placeholder="https://graph.facebook.com/v19.0/..." /></div>
-              <div><label className="mb-1 block text-sm font-medium">Token</label><Input type="password" value={channelForm.apiToken} onChange={(e) => setChannelForm({ ...channelForm, apiToken: e.target.value })} /></div>
-            </>
-          )}
-          <Button type="submit" className="w-full">Salvar</Button>
-        </form>
-      </Modal>
     </div>
   );
 }

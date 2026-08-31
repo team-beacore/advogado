@@ -30,8 +30,8 @@ export default function Dashboard() {
       .catch((e: Error) => setError(e.message));
   }, []);
 
-  if (error) return <div className="text-red-600">{error}</div>;
-  if (!data) return <div className="text-gray-500">Carregando…</div>;
+  if (error) return <div className="rounded-lg border border-danger-100 bg-danger-50 px-4 py-3 text-sm text-danger-700">{error}</div>;
+  if (!data) return <div className="flex items-center gap-2.5 text-sm text-gray-500"><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-200 border-t-brand-600" />Carregando…</div>;
 
   const hasData = data.counts.activeCases + data.counts.pendingTasks + data.counts.pendingPublications > 0;
 
@@ -41,7 +41,7 @@ export default function Dashboard() {
   if (!hasData && finance.receivableCount === 0) {
     return (
       <div>
-        <h1 className="mb-6 text-xl font-semibold">Visão Geral</h1>
+        <h1 className="page-title mb-6">Visão Geral</h1>
         <EmptyState title="Nenhum processo cadastrado." hint="Comece criando seu primeiro cliente e processo." />
       </div>
     );
@@ -49,34 +49,34 @@ export default function Dashboard() {
 
   return (
     <div>
-      <h1 className="mb-6 text-xl font-semibold">Visão Geral</h1>
+      <h1 className="page-title mb-6">Visão Geral</h1>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Link to="/processos" className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm hover:border-brand-300">
-          <div className="text-sm text-gray-500">Processos ativos</div>
-          <div className="mt-1 text-3xl font-bold">{data.counts.activeCases}</div>
+        <Link to="/processos" className="group surface p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-elevated">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-400">Processos ativos</div>
+          <div className="mt-1.5 font-display text-[1.9rem] font-semibold tracking-tightest text-gray-900">{data.counts.activeCases}</div>
         </Link>
-        <Link to="/tarefas" className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm hover:border-brand-300">
-          <div className="text-sm text-gray-500">Tarefas pendentes</div>
-          <div className="mt-1 text-3xl font-bold">{data.counts.pendingTasks}</div>
+        <Link to="/tarefas" className="group surface p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-elevated">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-400">Tarefas pendentes</div>
+          <div className="mt-1.5 font-display text-[1.9rem] font-semibold tracking-tightest text-gray-900">{data.counts.pendingTasks}</div>
         </Link>
-        <Link to="/tarefas" className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm hover:border-brand-300">
-          <div className="text-sm text-gray-500">Tarefas atrasadas</div>
-          <div className="mt-1 text-3xl font-bold text-red-600">{data.counts.overdueTasks}</div>
+        <Link to="/tarefas" className="group surface p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-elevated">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-400">Tarefas atrasadas</div>
+          <div className="mt-1 font-display text-[1.9rem] font-semibold tracking-tightest text-danger-600">{data.counts.overdueTasks}</div>
         </Link>
-        <Link to="/intimacoes" className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm hover:border-brand-300">
-          <div className="text-sm text-gray-500">Intimações pendentes</div>
-          <div className="mt-1 text-3xl font-bold text-yellow-600">{data.counts.pendingPublications}</div>
+        <Link to="/intimacoes" className="group surface p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-elevated">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-400">Intimações pendentes</div>
+          <div className="mt-1 font-display text-[1.9rem] font-semibold tracking-tightest text-warning-600">{data.counts.pendingPublications}</div>
         </Link>
         {finance.receivableCount > 0 && (
-          <Link to="/financeiro" className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm hover:border-brand-300">
-            <div className="text-sm text-gray-500">A receber</div>
-            <div className="mt-1 text-3xl font-bold">{formatBRL(finance.receivableTotal)}</div>
+          <Link to="/financeiro" className="group surface p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-elevated">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-400">A receber</div>
+            <div className="mt-1.5 font-display text-[1.9rem] font-semibold tracking-tightest text-gray-900">{formatBRL(finance.receivableTotal)}</div>
           </Link>
         )}
         {finance.receivedTotal > 0 && (
-          <Link to="/financeiro" className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm hover:border-brand-300">
-            <div className="text-sm text-gray-500">Recebido</div>
-            <div className="mt-1 text-3xl font-bold text-green-600">{formatBRL(finance.receivedTotal)}</div>
+          <Link to="/financeiro" className="group surface p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-elevated">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-400">Recebido</div>
+            <div className="mt-1 font-display text-[1.9rem] font-semibold tracking-tightest text-success-600">{formatBRL(finance.receivedTotal)}</div>
           </Link>
         )}
       </div>
@@ -88,9 +88,9 @@ export default function Dashboard() {
           ) : (
             <ul className="space-y-2">
               {data.todayTasks.map((t) => (
-                <li key={String(t.id)} className="flex items-center justify-between rounded border border-gray-100 px-3 py-2">
+                <li key={String(t.id)} className="flex items-center justify-between rounded-lg border border-gray-200 px-3.5 py-3 transition-colors hover:bg-gray-50">
                   <div>
-                    <div className="text-sm font-medium">{String(t.title)}</div>
+                    <div className="text-sm font-semibold text-gray-900">{String(t.title)}</div>
                     <div className="text-xs text-gray-500">{String(t.process_title ?? '')}</div>
                   </div>
                   <Badge color={statusColor(String(t.priority))}>{statusLabel(String(t.priority))}</Badge>
@@ -105,9 +105,9 @@ export default function Dashboard() {
           ) : (
             <ul className="space-y-2">
               {data.upcomingTasks.map((t) => (
-                <li key={String(t.id)} className="flex items-center justify-between rounded border border-gray-100 px-3 py-2">
+                <li key={String(t.id)} className="flex items-center justify-between rounded-lg border border-gray-200 px-3.5 py-3 transition-colors hover:bg-gray-50">
                   <div>
-                    <div className="text-sm font-medium">{String(t.title)}</div>
+                    <div className="text-sm font-semibold text-gray-900">{String(t.title)}</div>
                     <div className="text-xs text-gray-500">{String(t.process_title ?? '')}</div>
                   </div>
                   <div className="text-xs text-gray-400">{formatDateTime(String(t.due_date ?? ''))}</div>
@@ -125,7 +125,7 @@ export default function Dashboard() {
           ) : (
             <ul className="space-y-2">
               {data.recentActivities.map((a) => (
-                <li key={String(a.id)} className="flex items-center justify-between rounded border border-gray-100 px-3 py-2">
+                <li key={String(a.id)} className="flex items-center justify-between rounded-lg border border-gray-200 px-3.5 py-3 transition-colors hover:bg-gray-50">
                   <div className="text-sm">
                     <span className="font-medium">{String(a.title)}</span>
                     {Boolean(a.process_title) && <span className="text-gray-500"> · {String(a.process_title)}</span>}

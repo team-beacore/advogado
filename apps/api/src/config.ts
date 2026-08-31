@@ -24,6 +24,15 @@ const envSchema = z.object({
   OCR_ENABLED: z.string().default('false'),
   SESSION_TTL_DAYS: z.coerce.number().positive().default(30),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
+  SMTP_HOST: z.string().default(''),
+  SMTP_PORT: z.coerce.number().int().positive().default(587),
+  SMTP_USER: z.string().default(''),
+  SMTP_PASSWORD: z.string().default(''),
+  SMTP_FROM: z.string().default(''),
+  SMTP_SECURE: z.string().default('false'),
+  SUPER_ADMIN_EMAIL: z.string().default(''),
+  SUPER_ADMIN_PASSWORD: z.string().default(''),
+  SUPER_ADMIN_NAME: z.string().default('Plataforma'),
 });
 
 export type Env = z.infer<typeof envSchema>;

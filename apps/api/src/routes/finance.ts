@@ -6,7 +6,8 @@ import {
   registerPaymentSchema,
   chargePaymentSchema,
 } from '@advogado/shared';
-import { requireAuth, requireOrg, getOrgId, requireRole } from '../auth/middleware';
+import { requireAuth, requireOrg, getOrgId, requirePermission } from '../auth/middleware';
+import { PERMISSIONS } from '@advogado/shared';
 import * as financeService from '../finance/service';
 
 const router = Router();
@@ -37,7 +38,7 @@ router.get('/contracts', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/contracts', requireRole('ADMIN', 'LAWYER'), async (req, res, next) => {
+router.post('/contracts', requirePermission(PERMISSIONS.BILLING_MANAGE), async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
     const data = createContractSchema.parse(req.body);
@@ -60,7 +61,7 @@ router.get('/contracts/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.patch('/contracts/:id', requireRole('ADMIN', 'LAWYER'), async (req, res, next) => {
+router.patch('/contracts/:id', requirePermission(PERMISSIONS.BILLING_MANAGE), async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
     const data = updateContractSchema.parse(req.body);
@@ -88,7 +89,7 @@ router.get('/invoices', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/invoices', requireRole('ADMIN', 'LAWYER'), async (req, res, next) => {
+router.post('/invoices', requirePermission(PERMISSIONS.BILLING_MANAGE), async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
     const data = createInvoiceSchema.parse(req.body);
@@ -111,7 +112,7 @@ router.get('/invoices/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/payments', requireRole('ADMIN', 'LAWYER'), async (req, res, next) => {
+router.post('/payments', requirePermission(PERMISSIONS.PAYMENTS_MANAGE), async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
     const data = registerPaymentSchema.parse(req.body);
@@ -126,7 +127,7 @@ router.post('/payments', requireRole('ADMIN', 'LAWYER'), async (req, res, next) 
   }
 });
 
-router.post('/charges', requireRole('ADMIN', 'LAWYER'), async (req, res, next) => {
+router.post('/charges', requirePermission(PERMISSIONS.BILLING_MANAGE), async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
     const data = chargePaymentSchema.parse(req.body);
@@ -141,7 +142,7 @@ router.post('/charges', requireRole('ADMIN', 'LAWYER'), async (req, res, next) =
   }
 });
 
-router.post('/payments/:id/confirm', requireRole('ADMIN', 'LAWYER'), async (req, res, next) => {
+router.post('/payments/:id/confirm', requirePermission(PERMISSIONS.PAYMENTS_MANAGE), async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
     const result = await financeService.confirmPayment(orgId, req.params.id!, req.user!.id, req.ip);

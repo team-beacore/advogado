@@ -27,22 +27,30 @@ export default function Onboarding() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-md">
-        <h1 className="mb-2 text-center text-2xl font-bold text-gray-900">Criar organização</h1>
-        <p className="mb-8 text-center text-sm text-gray-500">
-          Olá, {user?.name}. Crie a organização do seu escritório para começar.
-        </p>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <ErrorAlert error={error} />
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Nome da organização</label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Silva & Advogados" required />
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-5 py-14">
+      <div className="w-full max-w-md animate-fade-in">
+        <div className="mb-8 text-center">
+          <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-brand-950 ring-1 ring-inset ring-gold-300/25">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#d8c188" strokeWidth="1.5" strokeLinecap="round" className="h-5 w-5">
+              <path d="M12 4v16M6 20h12M4 9h8L8 15 4 9Zm12 0h4l-2 4-2-4Z" />
+            </svg>
           </div>
-          <Button type="submit" disabled={loading} className="w-full">
-            {loading ? 'Criando…' : 'Criar organização'}
-          </Button>
-        </form>
+          <div className="eyebrow">Primeiro passo</div>
+          <h1 className="mt-2 font-display text-[1.7rem] font-semibold tracking-tightest text-gray-900">Criar organização</h1>
+          <p className="page-subtitle">Olá, {user?.name}. Crie a organização do seu escritório para começar.</p>
+        </div>
+        <div className="surface p-6 sm:p-7">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <ErrorAlert error={error} />
+            <div>
+              <label className="field-label">Nome da organização</label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Silva & Advogados" required />
+            </div>
+            <Button type="submit" disabled={loading} className="w-full py-2.5">
+              {loading ? 'Criando…' : 'Criar organização'}
+            </Button>
+          </form>
+        </div>
       </div>
     </div>
   );

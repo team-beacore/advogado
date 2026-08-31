@@ -6,8 +6,12 @@ export interface AuthUser {
   id: string;
   name: string;
   email: string;
+  phone: string | null;
   organizationId: string | null;
-  role: 'ADMIN' | 'LAWYER' | 'ASSISTANT' | null;
+  organizationType: 'SOLO' | 'OFFICE' | null;
+  role: 'SUPER_ADMIN' | 'ADMIN' | 'LAWYER' | 'ASSISTANT' | 'FINANCE' | null;
+  permissions: string[];
+  isSuperAdmin: boolean;
   sessionId: string;
 }
 
@@ -15,7 +19,7 @@ interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
   refresh: () => Promise<void>;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<AuthUser | null>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   switchOrg: (organizationId: string) => Promise<void>;
@@ -44,8 +48,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     await apiPost('/api/auth/login', { email, password });
-    await refresh();
-  }, [refresh]);
+    const res = await apiGet<{ user: AuthUser }>('/api/auth/me');
+    setUser(res.user);
+    return res.user;
+  }, []);
 
   const register = useCallback(async (name: string, email: string, password: string) => {
     await apiPost('/api/auth/register', { name, email, password });

@@ -110,6 +110,40 @@ describe('AI', () => {
     assert.equal(interactions.body.items[0].type, 'RESUME');
   });
 
+  it('parses structured output even when provider wraps JSON in markdown fences', async () => {
+    class FencedProvider implements AIProvider {
+      readonly name = 'fenced';
+      isConfigured(): boolean {
+        return true;
+      }
+      async generate(): Promise<AIResponse> {
+        return {
+          text: '```json\n' + JSON.stringify({
+            resumo: 'Resumo fenced',
+            fatosImportantes: ['Fato A'],
+            eventosRecentes: ['Evento B'],
+            pontosAtencao: ['Atenção C'],
+            informacoesAusentes: ['Nenhuma'],
+          }) + '\n```',
+          model: 'fenced-model',
+        };
+      }
+    }
+    setAIProviderForTests(new FencedProvider());
+    try {
+      const session = await helper.registerAndLogin();
+      const proc = await createCase(session);
+      const res = await request(app)
+        .post(`/api/ai/processes/${proc.id}/summarize`)
+        .set('Cookie', session.cookie)
+        .expect(200);
+      assert.ok(res.body.structured);
+      assert.equal(res.body.structured.resumo, 'Resumo fenced');
+    } finally {
+      setAIProviderForTests(new FakeProvider());
+    }
+  });
+
   it('adds AI_EXECUTED timeline event', async () => {
     const session = await helper.registerAndLogin();
     const proc = await createCase(session);

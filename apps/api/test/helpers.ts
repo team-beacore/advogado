@@ -61,7 +61,7 @@ export async function createSecondUserInOrg(app: Express, admin: Session, opts: 
   const cookie = loginRes.headers['set-cookie']?.[0]?.split(';')[0]!;
   // admin adds user to org
   await request(app)
-    .post(`/api/organizations/${admin.orgId}/members`)
+    .post('/api/organizations/members')
     .set('Cookie', admin.cookie)
     .send({ email, role: opts.role ?? 'LAWYER' })
     .expect(201);
@@ -73,7 +73,25 @@ export async function resetDb(): Promise<void> {
   const pool = getPool();
   await pool.query(
     `TRUNCATE TABLE audit_logs, ai_approvals, ai_interactions, case_events, case_members, documents,
-     legal_publications, tasks, notifications, leads, clients, cases, organization_members, organizations,
+     legal_publications, tasks, notification_deliveries, notifications, notification_preferences,
+     client_notification_preferences, leads, clients, cases, organization_members, organizations,
      sessions, users RESTART IDENTITY CASCADE`,
   );
+}
+
+/** Cria um SUPER ADMIN (implantador) diretamente no banco e retorna a sessão. */
+export async function createSuperAdmin(app: Express): Promise<Session> {
+  const pool = getPool();
+  const email = uniqueEmail('super');
+  const password = 'test1234';
+  const { ScryptHasher } = await import('../src/auth/password');
+  const hasher = new ScryptHasher();
+  const hash = hasher.hash(password);
+  await pool.query(
+    `INSERT INTO users (name, email, password_hash, is_super_admin) VALUES ($1, $2, $3, TRUE)`,
+    ['Super Admin', email, hash],
+  );
+  const loginRes = await request(app).post('/api/auth/login').send({ email, password }).expect(200);
+  const cookie = loginRes.headers['set-cookie']?.[0]?.split(';')[0]!;
+  return { cookie, userId: loginRes.body.user.id, email, name: 'Super Admin', orgId: '', role: 'SUPER_ADMIN' };
 }

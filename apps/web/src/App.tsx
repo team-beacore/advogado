@@ -15,6 +15,12 @@ import Documents from './pages/Documents';
 import Leads from './pages/Leads';
 import Settings from './pages/Settings';
 import Finance from './pages/Finance';
+import Team from './pages/Team';
+import SuperAdmin from './pages/SuperAdmin';
+import SuperAdminInstall from './pages/SuperAdminInstall';
+import PortalLogin from './pages/PortalLogin';
+import PortalDashboard from './pages/PortalDashboard';
+import PortalProcessDetail from './pages/PortalProcessDetail';
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -27,6 +33,8 @@ function Protected({ children }: { children: React.ReactNode }) {
 
 function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  // SUPER ADMIN pertence à camada técnica, fora de qualquer organização
+  if (user?.isSuperAdmin) return <Navigate to="/superadmin" replace />;
   if (user && !user.organizationId) return <Navigate to="/onboarding" replace />;
   return <>{children}</>;
 }
@@ -34,7 +42,19 @@ function OnboardingGuard({ children }: { children: React.ReactNode }) {
 function RequireOrg({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
+  // SUPER ADMIN nunca passa pelo fluxo jurídico/onboarding
+  if (user.isSuperAdmin) return <Navigate to="/superadmin" replace />;
   if (!user.organizationId) return <Navigate to="/onboarding" replace />;
+  return <>{children}</>;
+}
+
+function SuperAdminGuard({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  if (loading) {
+    return <div className="flex min-h-screen items-center justify-center text-gray-500">Carregando…</div>;
+  }
+  if (!user) return <Navigate to="/login" replace />;
+  if (!user.isSuperAdmin) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
@@ -44,6 +64,8 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/onboarding" element={<Protected><Onboarding /></Protected>} />
+      <Route path="/superadmin" element={<SuperAdminGuard><SuperAdmin /></SuperAdminGuard>} />
+      <Route path="/superadmin/install" element={<SuperAdminGuard><SuperAdminInstall /></SuperAdminGuard>} />
       <Route path="/" element={<Protected><OnboardingGuard><Layout /></OnboardingGuard></Protected>}>
         <Route index element={<RequireOrg><Dashboard /></RequireOrg>} />
         <Route path="processos" element={<RequireOrg><Processes /></RequireOrg>} />
@@ -56,7 +78,11 @@ export default function App() {
         <Route path="leads" element={<RequireOrg><Leads /></RequireOrg>} />
         <Route path="financeiro" element={<RequireOrg><Finance /></RequireOrg>} />
         <Route path="configuracoes" element={<RequireOrg><Settings /></RequireOrg>} />
+        <Route path="equipe" element={<RequireOrg><Team /></RequireOrg>} />
       </Route>
+      <Route path="/portal/login" element={<PortalLogin />} />
+      <Route path="/portal" element={<PortalDashboard />} />
+      <Route path="/portal/processos/:id" element={<PortalProcessDetail />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

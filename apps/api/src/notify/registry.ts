@@ -1,11 +1,10 @@
 import type { NotificationChannel } from './types';
 import { EmailChannel } from './email';
-import { WhatsAppChannel } from './whatsapp';
 
 let channelsOverride: NotificationChannel[] | null = null;
 
 export function getNotificationChannels(): NotificationChannel[] {
-  return channelsOverride ?? [new EmailChannel(), new WhatsAppChannel()];
+  return channelsOverride ?? [new EmailChannel()];
 }
 
 export function setNotificationChannelsForTests(channels: NotificationChannel[] | null): void {

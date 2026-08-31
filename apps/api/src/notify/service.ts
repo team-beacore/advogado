@@ -1,6 +1,7 @@
 import { getPool } from '../db/client';
 import { getNotificationChannels } from './registry';
 import type { ChannelMessage } from './types';
+import { getNotificationPreferences } from '../services/preferencesService';
 
 export async function getChannelConfig(organizationId: string, channel: string): Promise<Record<string, unknown> | null> {
   const pool = getPool();
@@ -38,7 +39,6 @@ export async function getChannelStatus(organizationId: string): Promise<Array<{ 
 export interface DispatchOptions {
   userId?: string | null;
   recipientEmail?: string | null;
-  recipientPhone?: string | null;
   title: string;
   description: string;
 }
@@ -51,10 +51,9 @@ export async function dispatchNotification(organizationId: string, notificationI
   for (const ch of channels) {
     const config = await getChannelConfig(organizationId, ch.name);
     const enabled = Boolean(config?.enabled);
-    const recipient = ch.name === 'EMAIL' ? opts.recipientEmail : opts.recipientPhone;
-    if (!enabled || !config || !recipient) {
-      continue;
-    }
+    const recipient = opts.recipientEmail;
+    if (!recipient) continue;
+
     const deliveryRes = await pool.query(
       `INSERT INTO notification_deliveries (organization_id, notification_id, user_id, channel, recipient, subject, body, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'PENDING') RETURNING *`,
@@ -62,8 +61,13 @@ export async function dispatchNotification(organizationId: string, notificationI
     );
     const delivery = deliveryRes.rows[0];
 
-    const message: ChannelMessage = { to: recipient, subject: opts.title, body: opts.description };
-    const result = await ch.send(message, config);
+    let result: { channel: string; status: string; error?: string | null; externalReference?: string | null };
+    if (!enabled || !config || !ch.isConfigured(config)) {
+      result = { channel: ch.name, status: 'NOT_CONFIGURED', error: `Canal ${ch.name} não configurado.` };
+    } else {
+      const message: ChannelMessage = { to: recipient, subject: opts.title, body: opts.description };
+      result = await ch.send(message, config);
+    }
     await pool.query(
       `UPDATE notification_deliveries SET status = $1, error = $2, external_reference = $3, sent_at = CASE WHEN $1 = 'SENT' THEN now() ELSE NULL END
        WHERE id = $4`,
@@ -72,6 +76,34 @@ export async function dispatchNotification(organizationId: string, notificationI
     deliveries.push({ ...delivery, status: result.status, error: result.error ?? null });
   }
   return deliveries;
+}
+
+/** Envia notificação de acordo com as preferências do usuário. */
+export async function dispatchToUserResponsible(organizationId: string, notificationId: string, processId: string, opts: { title: string; description: string }): Promise<void> {
+  const pool = getPool();
+  const caseRes = await pool.query(
+    'SELECT c.responsible_id, c.title, c.process_number FROM cases c WHERE c.id = $1 AND c.organization_id = $2',
+    [processId, organizationId],
+  );
+  const caseRow = caseRes.rows[0];
+  const responsibleId = caseRow?.responsible_id;
+  if (!responsibleId) return;
+  const userRes = await pool.query('SELECT id, email FROM users WHERE id = $1', [responsibleId]);
+  const user = userRes.rows[0];
+  if (!user) return;
+
+  const prefs = await getNotificationPreferences(responsibleId);
+  if (!prefs.newPublication || !prefs.emailEnabled) return;
+
+  const processLabel = caseRow.title || caseRow.process_number || '';
+  const subject = `Nova intimação${processLabel ? ` — ${processLabel}` : ''}`;
+
+  await dispatchNotification(organizationId, notificationId, {
+    userId: responsibleId,
+    recipientEmail: user.email ?? null,
+    title: subject,
+    description: opts.description,
+  });
 }
 
 export async function listDeliveries(organizationId: string, opts: { page?: number; pageSize?: number }) {
@@ -85,4 +117,46 @@ export async function listDeliveries(organizationId: string, opts: { page?: numb
   );
   const countRes = await pool.query('SELECT count(*)::int AS total FROM notification_deliveries WHERE organization_id = $1', [organizationId]);
   return { items: res.rows, total: countRes.rows[0]?.total ?? 0, page, pageSize };
+}
+
+/**
+ * Comunicação controlada ao cliente sobre movimentação no processo.
+ * O cliente NÃO recebe o conteúdo integral da intimação — apenas um aviso genérico,
+ * e somente se as preferências do cliente autorizarem.
+ */
+export async function notifyClientOfUpdate(organizationId: string, processId: string): Promise<void> {
+  const pool = getPool();
+  const caseRes = await pool.query(
+    'SELECT c.client_id, c.title FROM cases c WHERE c.id = $1 AND c.organization_id = $2',
+    [processId, organizationId],
+  );
+  const clientId = caseRes.rows[0]?.client_id;
+  if (!clientId) return;
+  const clientRes = await pool.query(
+    'SELECT id, name, email FROM clients WHERE id = $1 AND organization_id = $2',
+    [clientId, organizationId],
+  );
+  const client = clientRes.rows[0];
+  if (!client) return;
+
+  const { getClientNotificationPreferences } = await import('../services/preferencesService');
+  const prefs = await getClientNotificationPreferences(clientId);
+  if (!prefs.processUpdatesEnabled || !prefs.emailEnabled) return;
+
+  const subject = 'Atualização do seu processo';
+  const body = `Olá, ${client.name || 'cliente'}.\n\nHouve uma nova movimentação no seu processo.\nSeu advogado foi informado e está analisando a atualização.\n\nAcesse a plataforma para consultar mais informações.`;
+
+  const notifRes = await pool.query(
+    `INSERT INTO notifications (organization_id, process_id, user_id, type, title, description, status)
+     VALUES ($1, $2, NULL, 'CLIENT_UPDATE', $3, $4, 'PENDING') RETURNING id`,
+    [organizationId, processId, subject, body],
+  );
+  const notificationId = notifRes.rows[0].id as string;
+
+  await dispatchNotification(organizationId, notificationId, {
+    userId: null,
+    recipientEmail: client.email ?? null,
+    title: subject,
+    description: body,
+  });
 }

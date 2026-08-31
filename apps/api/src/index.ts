@@ -34,6 +34,26 @@ async function main() {
     console.log('Migrações em dia.');
   }
 
+  // Bootstrap SUPER ADMIN da plataforma (usuário implantador, sem vínculo com organização)
+  const envConf = loadEnv();
+  if (envConf.SUPER_ADMIN_EMAIL && envConf.SUPER_ADMIN_PASSWORD) {
+    try {
+      const { ScryptHasher } = await import('./auth/password');
+      const hasher = new ScryptHasher();
+      const existing = await pool.query('SELECT id FROM users WHERE email = $1', [envConf.SUPER_ADMIN_EMAIL]);
+      if (existing.rows.length === 0) {
+        const hash = hasher.hash(envConf.SUPER_ADMIN_PASSWORD);
+        await pool.query(
+          `INSERT INTO users (name, email, password_hash, is_super_admin) VALUES ($1, $2, $3, TRUE)`,
+          [envConf.SUPER_ADMIN_NAME, envConf.SUPER_ADMIN_EMAIL, hash],
+        );
+        console.log('SUPER ADMIN criado:', envConf.SUPER_ADMIN_EMAIL);
+      }
+    } catch (e) {
+      console.log('Aviso: bootstrap SUPER ADMIN falhou (pode já existir ou não há DB):', (e as Error).message);
+    }
+  }
+
   const app = createApp();
   const server = app.listen(env.PORT, () => {
     console.log(`API rodando em http://localhost:${env.PORT}`);

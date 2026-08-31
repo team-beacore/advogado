@@ -53,8 +53,8 @@ export default function Clients() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Clientes</h1>
+      <div className="mb-7 flex flex-wrap items-end justify-between gap-3 border-b border-gray-200/80 pb-5">
+        <h1 className="page-title">Clientes</h1>
         <Button onClick={() => setShowCreate(true)}>Novo Cliente</Button>
       </div>
 
@@ -70,7 +70,7 @@ export default function Clients() {
       <ErrorAlert error={error} />
 
       {loading ? (
-        <div className="text-gray-500">Carregando…</div>
+        <div className="flex items-center gap-2.5 text-sm text-gray-500"><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-200 border-t-brand-600" />Carregando…</div>
       ) : clients.length === 0 ? (
         <EmptyState title="Nenhum cliente cadastrado." hint="Crie seu primeiro cliente para começar." />
       ) : (
@@ -79,7 +79,7 @@ export default function Clients() {
             <Link
               key={c.id}
               to={`/clientes/${c.id}`}
-              className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm hover:border-brand-300"
+              className="group surface p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-elevated"
             >
               <div className="font-medium">{c.name}</div>
               {c.email && <div className="mt-1 text-sm text-gray-500">{c.email}</div>}
@@ -92,26 +92,26 @@ export default function Clients() {
       )}
 
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Novo Cliente">
-        <form onSubmit={handleCreate} className="space-y-3">
+        <form onSubmit={handleCreate} className="space-y-4">
           <ErrorAlert error={formError} />
           <div>
-            <label className="mb-1 block text-sm font-medium">Nome *</label>
+            <label className="field-label">Nome *</label>
             <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Email</label>
+            <label className="field-label">Email</label>
             <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Telefone</label>
+            <label className="field-label">Telefone</label>
             <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">CPF/CNPJ</label>
+            <label className="field-label">CPF/CNPJ</label>
             <Input value={form.cpfCnpj} onChange={(e) => setForm({ ...form, cpfCnpj: e.target.value })} />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Observações</label>
+            <label className="field-label">Observações</label>
             <Input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           </div>
           <Button type="submit" className="w-full">Criar</Button>

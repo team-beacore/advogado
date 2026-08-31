@@ -3,6 +3,7 @@ import {
   CASE_STATUS,
   CONTRACT_STATUS,
   INVOICE_STATUS,
+  INTERNAL_ROLES,
   LEAD_STATUS,
   NOTIFICATION_CHANNELS,
   NOTIFICATION_STATUS,
@@ -20,6 +21,7 @@ export const registerSchema = z.object({
   name: z.string().trim().min(2).max(255),
   email: emailSchema,
   password: z.string().min(8).max(128),
+  phone: z.string().trim().max(40).optional().or(z.literal('')).transform((v) => (v ? v : null)),
 });
 
 export const loginSchema = z.object({
@@ -110,13 +112,35 @@ export const updateNotificationSchema = z.object({
   status: z.enum(NOTIFICATION_STATUS),
 });
 
+export const updateUserProfileSchema = z.object({
+  name: z.string().trim().min(2).max(255).optional(),
+  phone: z.string().trim().max(40).optional().or(z.literal('')).transform((v) => (v ? v : null)),
+});
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(128),
+  newPassword: z.string().min(8).max(128),
+});
+
+export const userNotificationPreferencesSchema = z.object({
+  emailEnabled: z.boolean().optional(),
+  newPublication: z.boolean().optional(),
+  deadlineAlert: z.boolean().optional(),
+  paymentAlert: z.boolean().optional(),
+});
+
+export const clientNotificationPreferencesSchema = z.object({
+  emailEnabled: z.boolean().optional(),
+  processUpdatesEnabled: z.boolean().optional(),
+});
+
 export const aiDraftSchema = z.object({
   instruction: z.string().trim().min(1).max(8000),
 });
 
 export const addMemberSchema = z.object({
   userId: z.string().uuid(),
-  role: z.enum(ROLES).default('LAWYER'),
+  role: z.enum(INTERNAL_ROLES).default('LAWYER'),
 });
 
 export const createEventSchema = z.object({
@@ -198,5 +222,27 @@ export const updateCaseMemberPermissionsSchema = z.object({
   canView: z.boolean().optional(),
   canEdit: z.boolean().optional(),
   canManage: z.boolean().optional(),
-  role: z.enum(ROLES).optional(),
+  role: z.enum(INTERNAL_ROLES).optional(),
+});
+
+// --- Equipe / membros da organização ---
+export const addMemberByEmailSchema = z.object({
+  email: z.string().trim().email().max(255),
+  role: z.enum(INTERNAL_ROLES).default('LAWYER'),
+  name: z.string().trim().min(2).max(255).optional(),
+});
+
+// --- Portal do cliente ---
+export const clientPortalInviteSchema = z.object({
+  email: z.string().trim().email().max(255),
+});
+
+export const clientPortalLoginSchema = z.object({
+  email: emailSchema,
+  password: z.string().min(1).max(128),
+});
+
+export const clientCaseShareSchema = z.object({
+  caseId: z.string().uuid(),
+  canViewDocuments: z.boolean().default(false),
 });

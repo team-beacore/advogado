@@ -35,7 +35,6 @@ export async function getSecurityReport(organizationId: string, userId: string) 
   for (const row of settingsRes.rows) settings.set(row.key, row.value);
 
   const integrations = {
-    whatsapp: settings.get('integration.whatsapp') ?? null,
     pje: settings.get('integration.pje') ?? null,
     esaj: settings.get('integration.esaj') ?? null,
     projudi: settings.get('integration.projudi') ?? null,

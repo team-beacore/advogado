@@ -156,15 +156,7 @@ Formato: resposta em JSON com chaves: "rascunho" (string, o texto sugerido), "ob
 
 async function callAi(provider: AIProvider, system: string, user: string, operation: string): Promise<OperationResult> {
   const response = await provider.generate({ system, user, operation });
-  let structured: Record<string, unknown> | null = null;
-  try {
-    const json = JSON.parse(response.text);
-    if (typeof json === 'object' && json !== null) {
-      structured = json as Record<string, unknown>;
-    }
-  } catch {
-    // Se a resposta não for JSON válido, manter como texto
-  }
+  const structured = parseStructured(response.text);
   return {
     rawText: response.text,
     structured,
@@ -172,4 +164,37 @@ async function callAi(provider: AIProvider, system: string, user: string, operat
     generatedAt: new Date().toISOString(),
     disclaimer: AI_DISCLAIMER,
   };
+}
+
+/**
+ * Tenta extrair um objeto JSON estruturado da resposta do provedor.
+ * Provedores baseados em LLM podem envolver o JSON em blocos de código
+ * markdown (```json ... ```) ou adicionar texto ao redor — trata esses
+ * casos antes de descartar a resposta como texto puro.
+ */
+function parseStructured(text: string): Record<string, unknown> | null {
+  const candidates: string[] = [];
+  const trimmed = text.trim();
+  candidates.push(trimmed);
+
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced?.[1]) candidates.push(fenced[1].trim());
+
+  const firstBrace = trimmed.indexOf('{');
+  const lastBrace = trimmed.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    candidates.push(trimmed.slice(firstBrace, lastBrace + 1));
+  }
+
+  for (const candidate of candidates) {
+    try {
+      const json = JSON.parse(candidate);
+      if (typeof json === 'object' && json !== null) {
+        return json as Record<string, unknown>;
+      }
+    } catch {
+      // tentar próxima forma
+    }
+  }
+  return null;
 }

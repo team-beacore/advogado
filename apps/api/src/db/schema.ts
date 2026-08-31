@@ -1,5 +1,6 @@
 import {
   bigint,
+  boolean,
   index,
   jsonb,
   pgEnum,
@@ -10,7 +11,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
-export const roleEnum = pgEnum('role', ['ADMIN', 'LAWYER', 'ASSISTANT']);
+export const roleEnum = pgEnum('role', ['ADMIN', 'LAWYER', 'ASSISTANT', 'FINANCE']);
 export const caseStatusEnum = pgEnum('case_status', ['ACTIVE', 'SUSPENDED', 'ARCHIVED', 'CLOSED', 'DRAFT']);
 export const taskStatusEnum = pgEnum('task_status', ['TODO', 'IN_PROGRESS', 'DONE', 'CANCELLED']);
 export const taskPriorityEnum = pgEnum('task_priority', ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']);
@@ -24,6 +25,8 @@ export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),
   email: text('email').notNull(),
+  phone: text('phone'),
+  isSuperAdmin: boolean('is_super_admin').notNull().default(false),
   passwordHash: text('password_hash').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -32,6 +35,7 @@ export const users = pgTable('users', {
 export const organizations = pgTable('organizations', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),
+  planType: text('plan_type'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
@@ -270,3 +274,57 @@ export const settings = pgTable('settings', {
 }, (t) => [
   uniqueIndex('settings_org_key_unique').on(t.organizationId, t.key),
 ]);
+
+export const clientUsers = pgTable('client_users', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  clientId: uuid('client_id').notNull().references(() => clients.id, { onDelete: 'cascade' }),
+  email: text('email').notNull(),
+  passwordHash: text('password_hash').notNull(),
+  status: text('status').notNull().default('INVITED'),
+  lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex('client_users_client_unique').on(t.clientId),
+  uniqueIndex('client_users_email_unique').on(t.email),
+]);
+
+export const clientCaseAccess = pgTable('client_case_access', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: uuid('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  clientId: uuid('client_id').notNull().references(() => clients.id, { onDelete: 'cascade' }),
+  caseId: uuid('case_id').notNull().references(() => cases.id, { onDelete: 'cascade' }),
+  canViewDocuments: boolean('can_view_documents').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [uniqueIndex('client_case_access_unique').on(t.clientId, t.caseId)]);
+
+export const clientSessions = pgTable('client_sessions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  clientUserId: uuid('client_user_id').notNull().references(() => clientUsers.id, { onDelete: 'cascade' }),
+  organizationId: uuid('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  tokenHash: text('token_hash').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  lastActiveAt: timestamp('last_active_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [uniqueIndex('client_sessions_token_hash_unique').on(t.tokenHash)]);
+
+export const notificationPreferences = pgTable('notification_preferences', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  emailEnabled: boolean('email_enabled').notNull().default(true),
+  newPublication: boolean('new_publication').notNull().default(true),
+  deadlineAlert: boolean('deadline_alert').notNull().default(true),
+  paymentAlert: boolean('payment_alert').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [uniqueIndex('notification_preferences_user_unique').on(t.userId)]);
+
+export const clientNotificationPreferences = pgTable('client_notification_preferences', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  clientId: uuid('client_id').notNull().references(() => clients.id, { onDelete: 'cascade' }),
+  emailEnabled: boolean('email_enabled').notNull().default(false),
+  processUpdatesEnabled: boolean('process_updates_enabled').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [uniqueIndex('client_notification_prefs_client_unique').on(t.clientId)]);

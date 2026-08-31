@@ -14,6 +14,7 @@ describe('Audit logs', () => {
   it('logs client creation', async () => {
     const session = await helper.registerAndLogin();
     await request(app).post('/api/clients').set('Cookie', session.cookie).send({ name: 'Auditado' }).expect(201);
+    await new Promise((r) => setTimeout(r, 50));
     const logs = await request(app).get('/api/audit').set('Cookie', session.cookie).expect(200);
     assert.ok(logs.body.items.some((l: { action: string }) => l.action === 'CLIENT_CREATED'));
     assert.ok(logs.body.items.some((l: { entity: string }) => l.entity === 'client'));
@@ -44,6 +45,7 @@ describe('Audit logs', () => {
       .field('processId', proc.body.id)
       .expect(201);
     await request(app).get(`/api/documents/${upload.body.id}/download`).set('Cookie', session.cookie).expect(200);
+    await new Promise((r) => setTimeout(r, 50));
 
     const logs = await request(app).get('/api/audit?entity=document').set('Cookie', session.cookie).expect(200);
     const actions = logs.body.items.map((l: { action: string }) => l.action);

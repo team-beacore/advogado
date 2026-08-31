@@ -5,6 +5,7 @@ import {
   Button, SecondaryButton, Input, Select, Card, Badge, EmptyState, ErrorAlert, Textarea,
   formatDate, formatDateTime, formatBytes, statusColor, statusLabel, Modal,
 } from '../components/ui';
+import { FormattedAIOutput } from '../components/FormattedAIOutput';
 
 interface ProcessDetail {
   id: string;
@@ -73,16 +74,16 @@ export default function ProcessDetail() {
     { key: 'auditoria', label: 'Auditoria' },
   ];
 
-  if (loading) return <div className="text-gray-500">Carregando…</div>;
+  if (loading) return <div className="flex items-center gap-2.5 text-sm text-gray-500"><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-200 border-t-brand-600" />Carregando…</div>;
   if (error) return <ErrorAlert error={error} />;
   if (!data) return null;
 
   return (
     <div>
       <div className="mb-6">
-        <Link to="/processos" className="text-sm text-brand-600 hover:underline">← Processos</Link>
+        <Link to="/processos" className="inline-flex items-center gap-1.5 text-sm link-quiet">← Processos</Link>
         <div className="mt-2 flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold">{data.title}</h1>
+          <h1 className="page-title">{data.title}</h1>
           <Badge color={statusColor(data.status)}>{statusLabel(data.status)}</Badge>
         </div>
         <div className="mt-1 text-sm text-gray-500">
@@ -94,12 +95,12 @@ export default function ProcessDetail() {
         </div>
       </div>
 
-      <div className="mb-6 flex flex-wrap gap-1 border-b border-gray-200">
+      <div className="mb-7 -mx-4 flex gap-1 overflow-x-auto border-b border-gray-200 px-4 sm:mx-0 sm:flex-wrap sm:px-0">
         {tabs.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${tab === t.key ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-800'}`}
+            className={`-mb-px whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors ${tab === t.key ? 'border-brand-700 text-brand-800' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-800'}`}
           >
             {t.label}
           </button>
@@ -123,14 +124,14 @@ function Overview({ data }: { data: ProcessDetail }) {
       <div className="lg:col-span-2">
         <Card title="Resumo">
           <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div><dt className="text-xs text-gray-500">Título</dt><dd className="text-sm">{data.title}</dd></div>
-            <div><dt className="text-xs text-gray-500">Número</dt><dd className="text-sm">{data.process_number ?? '—'}</dd></div>
-            <div><dt className="text-xs text-gray-500">Tribunal</dt><dd className="text-sm">{data.court ?? '—'}</dd></div>
-            <div><dt className="text-xs text-gray-500">Jurisdição</dt><dd className="text-sm">{data.jurisdiction ?? '—'}</dd></div>
-            <div><dt className="text-xs text-gray-500">Área</dt><dd className="text-sm">{data.area ?? '—'}</dd></div>
-            <div><dt className="text-xs text-gray-500">Status</dt><dd className="text-sm">{statusLabel(data.status)}</dd></div>
-            <div><dt className="text-xs text-gray-500">Cliente</dt><dd className="text-sm">{data.client_name ?? '—'}</dd></div>
-            <div><dt className="text-xs text-gray-500">Responsável</dt><dd className="text-sm">{data.responsible_name ?? '—'}</dd></div>
+            <div><dt className="text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-400">Título</dt><dd className="mt-1 text-sm font-medium text-gray-900">{data.title}</dd></div>
+            <div><dt className="text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-400">Número</dt><dd className="mt-1 text-sm font-medium text-gray-900">{data.process_number ?? '—'}</dd></div>
+            <div><dt className="text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-400">Tribunal</dt><dd className="mt-1 text-sm font-medium text-gray-900">{data.court ?? '—'}</dd></div>
+            <div><dt className="text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-400">Jurisdição</dt><dd className="mt-1 text-sm font-medium text-gray-900">{data.jurisdiction ?? '—'}</dd></div>
+            <div><dt className="text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-400">Área</dt><dd className="mt-1 text-sm font-medium text-gray-900">{data.area ?? '—'}</dd></div>
+            <div><dt className="text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-400">Status</dt><dd className="mt-1 text-sm font-medium text-gray-900">{statusLabel(data.status)}</dd></div>
+            <div><dt className="text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-400">Cliente</dt><dd className="mt-1 text-sm font-medium text-gray-900">{data.client_name ?? '—'}</dd></div>
+            <div><dt className="text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-400">Responsável</dt><dd className="mt-1 text-sm font-medium text-gray-900">{data.responsible_name ?? '—'}</dd></div>
           </dl>
           {data.description && <p className="mt-4 text-sm text-gray-700">{data.description}</p>}
         </Card>
@@ -177,7 +178,7 @@ function TimelineTab({ data, onRefresh }: { data: ProcessDetail; onRefresh: () =
           {data.events.map((e) => (
             <li key={String(e.id)} className="relative">
               <span className="absolute -left-[31px] mt-1.5 h-3 w-3 rounded-full border-2 border-brand-600 bg-white" />
-              <div className="text-sm font-medium">{String(e.title)}</div>
+              <div className="text-sm font-semibold text-gray-900">{String(e.title)}</div>
               {Boolean(e.description) && <div className="text-sm text-gray-600">{String(e.description)}</div>}
               <div className="mt-0.5 text-xs text-gray-400">
                 {formatDateTime(String(e.created_at))} {Boolean(e.created_by_name) && <span>· {String(e.created_by_name)}</span>}
@@ -189,14 +190,14 @@ function TimelineTab({ data, onRefresh }: { data: ProcessDetail; onRefresh: () =
       )}
 
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Adicionar evento">
-        <form onSubmit={addEvent} className="space-y-3">
+        <form onSubmit={addEvent} className="space-y-4">
           <ErrorAlert error={formError} />
           <div>
-            <label className="mb-1 block text-sm font-medium">Título *</label>
+            <label className="field-label">Título *</label>
             <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Descrição</label>
+            <label className="field-label">Descrição</label>
             <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           </div>
           <Button type="submit" className="w-full">Adicionar</Button>
@@ -237,8 +238,8 @@ function DocumentsTab({ data, onRefresh }: { data: ProcessDetail; onRefresh: () 
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <div className="text-sm text-gray-500">{data.documents.length} documento(s)</div>
-        <label className="inline-flex cursor-pointer items-center rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+        <div className="meta font-medium">{data.documents.length} documento(s)</div>
+        <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-inset ring-brand-800/40 transition-all duration-200 hover:bg-brand-800 hover:shadow-elevated disabled:opacity-45">
           {uploading ? 'Enviando…' : 'Anexar documento'}
           <input type="file" className="hidden" onChange={handleUpload} disabled={uploading} />
         </label>
@@ -248,14 +249,14 @@ function DocumentsTab({ data, onRefresh }: { data: ProcessDetail; onRefresh: () 
         <EmptyState title="Nenhum documento anexado." hint="Anexe um arquivo (PDF, DOCX, imagem…)." />
       ) : (
         <div className="overflow-x-auto rounded-lg border border-gray-200">
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="bg-gray-50">
+          <table className="table-legal min-w-full">
+            <thead className="bg-gray-50/70">
               <tr>
-                <th className="px-4 py-2 text-left font-medium text-gray-500">Nome</th>
-                <th className="px-4 py-2 text-left font-medium text-gray-500">Tipo</th>
-                <th className="px-4 py-2 text-left font-medium text-gray-500">Tamanho</th>
-                <th className="px-4 py-2 text-left font-medium text-gray-500">Enviado por</th>
-                <th className="px-4 py-2 text-left font-medium text-gray-500">Data</th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-500">Nome</th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-500">Tipo</th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-500">Tamanho</th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-500">Enviado por</th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-500">Data</th>
                 <th className="px-4 py-2"></th>
               </tr>
             </thead>
@@ -268,8 +269,8 @@ function DocumentsTab({ data, onRefresh }: { data: ProcessDetail; onRefresh: () 
                   <td className="px-4 py-2 text-gray-500">{String(d.uploaded_by_name ?? '')}</td>
                   <td className="px-4 py-2 text-gray-500">{formatDate(String(d.created_at))}</td>
                   <td className="px-4 py-2 text-right">
-                    <a href={downloadUrl(`/api/documents/${String(d.id)}/download`)} className="mr-2 text-brand-600 hover:underline">Baixar</a>
-                    <button onClick={() => handleDelete(String(d.id))} className="text-red-600 hover:underline">Excluir</button>
+                    <a href={downloadUrl(`/api/documents/${String(d.id)}/download`)} className="mr-3 text-sm link-quiet">Baixar</a>
+                    <button onClick={() => handleDelete(String(d.id))} className="text-sm font-medium text-danger-600 underline-offset-4 transition-colors hover:text-danger-700 hover:underline">Excluir</button>
                   </td>
                 </tr>
               ))}
@@ -337,12 +338,12 @@ function PublicationsTab({ data, onRefresh }: { data: ProcessDetail; onRefresh: 
       {data.publications.length === 0 ? (
         <EmptyState title="Nenhuma intimação registrada." hint="Registre intimações reais recebidas do tribunal." />
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {data.publications.map((p) => (
-            <div key={String(p.id)} className="rounded-lg border border-gray-200 bg-white p-4">
+            <div key={String(p.id)} className="surface p-4">
               <div className="flex items-start justify-between">
                 <div>
-                  <div className="text-sm font-medium">
+                  <div className="text-sm font-semibold text-gray-900">
                     {String(p.source ?? 'Intimação')}
                     <span className="ml-2"><Badge color={statusColor(String(p.status))}>{statusLabel(String(p.status))}</Badge></span>
                   </div>
@@ -352,11 +353,11 @@ function PublicationsTab({ data, onRefresh }: { data: ProcessDetail; onRefresh: 
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <Button onClick={() => analyze(String(p.id))} disabled={analyzing === String(p.id)} className="px-3 py-1 text-xs">
+                  <Button onClick={() => analyze(String(p.id))} disabled={analyzing === String(p.id)} className="px-3 py-1.5 text-xs">
                     {analyzing === String(p.id) ? 'Analisando…' : 'Analisar com IA'}
                   </Button>
                   {p.status !== 'PROCESSED' && (
-                    <SecondaryButton onClick={() => updateStatus(String(p.id), 'PROCESSED')} className="px-3 py-1 text-xs">Marcar processada</SecondaryButton>
+                    <SecondaryButton onClick={() => updateStatus(String(p.id), 'PROCESSED')} className="px-3 py-1.5 text-xs">Marcar processada</SecondaryButton>
                   )}
                 </div>
               </div>
@@ -366,7 +367,10 @@ function PublicationsTab({ data, onRefresh }: { data: ProcessDetail; onRefresh: 
               {analysis && analysis.interactionId === String(p.id) && (
                 <div className="mt-3 rounded border border-blue-100 bg-blue-50 p-3 text-sm">
                   <div className="mb-1 font-medium text-blue-800">Análise da IA (revisão humana necessária)</div>
-                  <pre className="whitespace-pre-wrap text-blue-900">{JSON.stringify((analysis.structured as Record<string, unknown>) ?? analysis.rawText ?? {}, null, 2)}</pre>
+                  <FormattedAIOutput
+                    output={(analysis.structured as Record<string, unknown> | null) ?? null}
+                    rawText={typeof analysis.rawText === 'string' ? analysis.rawText : null}
+                  />
                   <div className="mt-1 text-xs text-blue-700">{(analysis.disclaimer as string) ?? ''}</div>
                 </div>
               )}
@@ -376,26 +380,26 @@ function PublicationsTab({ data, onRefresh }: { data: ProcessDetail; onRefresh: 
       )}
 
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Registrar intimação">
-        <form onSubmit={createPub} className="space-y-3">
+        <form onSubmit={createPub} className="space-y-4">
           <ErrorAlert error={formError} />
           <div>
-            <label className="mb-1 block text-sm font-medium">Origem</label>
+            <label className="field-label">Origem</label>
             <Input value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} placeholder="Ex.: DJSP, e-SAJ…" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Data de disponibilização</label>
+            <label className="field-label">Data de disponibilização</label>
             <Input type="datetime-local" value={form.availabilityDate} onChange={(e) => setForm({ ...form, availabilityDate: e.target.value })} />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Conteúdo *</label>
+            <label className="field-label">Conteúdo *</label>
             <Textarea rows={6} value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} required />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Referência externa</label>
+            <label className="field-label">Referência externa</label>
             <Input value={form.externalReference} onChange={(e) => setForm({ ...form, externalReference: e.target.value })} />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Prazo possível</label>
+            <label className="field-label">Prazo possível</label>
             <Input type="datetime-local" value={form.possibleDueDate} onChange={(e) => setForm({ ...form, possibleDueDate: e.target.value })} />
           </div>
           <Button type="submit" className="w-full">Registrar</Button>
@@ -447,8 +451,8 @@ function TasksTab({ data, onRefresh }: { data: ProcessDetail; onRefresh: () => P
           {data.tasks.map((t) => (
             <div key={String(t.id)} className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3">
               <div>
-                <div className="text-sm font-medium">{String(t.title)}</div>
-                {Boolean(t.description) && <div className="text-sm text-gray-500">{String(t.description)}</div>}
+                <div className="text-sm font-semibold text-gray-900">{String(t.title)}</div>
+                {Boolean(t.description) && <div className="mt-0.5 text-sm leading-relaxed text-gray-500">{String(t.description)}</div>}
                 <div className="mt-0.5 flex gap-2 text-xs text-gray-400">
                   <Badge color={statusColor(String(t.priority))}>{statusLabel(String(t.priority))}</Badge>
                   <Badge color={statusColor(String(t.status))}>{statusLabel(String(t.status))}</Badge>
@@ -457,9 +461,9 @@ function TasksTab({ data, onRefresh }: { data: ProcessDetail; onRefresh: () => P
                 </div>
               </div>
               {String(t.status) === 'TODO' || String(t.status) === 'IN_PROGRESS' ? (
-                <SecondaryButton onClick={() => updateStatus(String(t.id), 'DONE')} className="px-3 py-1 text-xs">Concluir</SecondaryButton>
+                <SecondaryButton onClick={() => updateStatus(String(t.id), 'DONE')} className="px-3 py-1.5 text-xs">Concluir</SecondaryButton>
               ) : (
-                <button onClick={() => updateStatus(String(t.id), 'TODO')} className="text-xs text-gray-500 hover:underline">Reabrir</button>
+                <button onClick={() => updateStatus(String(t.id), 'TODO')} className="text-xs font-medium text-gray-500 underline-offset-4 transition-colors hover:text-gray-800 hover:underline">Reabrir</button>
               )}
             </div>
           ))}
@@ -467,19 +471,19 @@ function TasksTab({ data, onRefresh }: { data: ProcessDetail; onRefresh: () => P
       )}
 
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Nova tarefa">
-        <form onSubmit={createTask} className="space-y-3">
+        <form onSubmit={createTask} className="space-y-4">
           <ErrorAlert error={formError} />
           <div>
-            <label className="mb-1 block text-sm font-medium">Título *</label>
+            <label className="field-label">Título *</label>
             <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Descrição</label>
+            <label className="field-label">Descrição</label>
             <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium">Prioridade</label>
+              <label className="field-label">Prioridade</label>
               <Select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
                 <option value="LOW">Baixa</option>
                 <option value="MEDIUM">Média</option>
@@ -488,7 +492,7 @@ function TasksTab({ data, onRefresh }: { data: ProcessDetail; onRefresh: () => P
               </Select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Prazo</label>
+              <label className="field-label">Prazo</label>
               <Input type="datetime-local" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} />
             </div>
           </div>
@@ -505,6 +509,10 @@ function AiTab({ processId, onRefresh }: { processId: string; onRefresh: () => P
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [draftInstruction, setDraftInstruction] = useState('');
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [page, setPage] = useState(1);
+
+  const PAGE_SIZE = 8;
 
   const load = useCallback(async () => {
     try {
@@ -519,13 +527,35 @@ function AiTab({ processId, onRefresh }: { processId: string; onRefresh: () => P
 
   useEffect(() => { void load(); }, [load]);
 
-  const run = async (kind: string, action: () => Promise<void>) => {
+  useEffect(() => {
+    setPage(1);
+    setExpanded(new Set());
+  }, [processId]);
+
+  const totalPages = Math.max(1, Math.ceil(interactions.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageItems = interactions.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const toggle = (id: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const run = async (kind: string, action: () => Promise<string | null>) => {
     setError(null);
     setBusy(kind);
     try {
-      await action();
+      const newInteractionId = await action();
       await load();
       await onRefresh();
+      if (newInteractionId) {
+        setPage(1);
+        setExpanded((prev) => new Set(prev).add(newInteractionId));
+      }
     } catch (e) { setError(e); }
     finally { setBusy(null); }
   };
@@ -539,7 +569,7 @@ function AiTab({ processId, onRefresh }: { processId: string; onRefresh: () => P
     } catch (e) { setError(e); }
   };
 
-  if (!aiStatus) return <div className="text-gray-500">Carregando…</div>;
+  if (!aiStatus) return <div className="flex items-center gap-2.5 text-sm text-gray-500"><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-200 border-t-brand-600" />Carregando…</div>;
 
   return (
     <div className="space-y-6">
@@ -555,7 +585,10 @@ function AiTab({ processId, onRefresh }: { processId: string; onRefresh: () => P
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Button
             disabled={!aiStatus.configured || busy !== null}
-            onClick={() => run('summarize', async () => { await apiPost(`/api/ai/processes/${processId}/summarize`); })}
+            onClick={() => run('summarize', async () => {
+              const res = await apiPost<{ interactionId?: string }>(`/api/ai/processes/${processId}/summarize`);
+              return res.interactionId ?? null;
+            })}
           >
             {busy === 'summarize' ? 'Resumindo…' : 'Resumir processo'}
           </Button>
@@ -563,7 +596,7 @@ function AiTab({ processId, onRefresh }: { processId: string; onRefresh: () => P
             <Input placeholder="Instrução para rascunho…" value={draftInstruction} onChange={(e) => setDraftInstruction(e.target.value)} />
             <Button
               disabled={!aiStatus.configured || busy !== null || !draftInstruction.trim()}
-              onClick={() => run('draft', async () => { await apiPost(`/api/ai/processes/${processId}/draft`, { instruction: draftInstruction }); })}
+              onClick={() => run('draft', async () => { await apiPost(`/api/ai/processes/${processId}/draft`, { instruction: draftInstruction }); return null; })}
               className="shrink-0"
             >
               {busy === 'draft' ? 'Gerando…' : 'Gerar rascunho'}
@@ -577,42 +610,61 @@ function AiTab({ processId, onRefresh }: { processId: string; onRefresh: () => P
         {interactions.length === 0 ? (
           <EmptyState title="Nenhuma execução de IA registrada." />
         ) : (
-          <div className="space-y-3">
-            {interactions.map((i) => {
-              const lastApproval = i.approvals?.[i.approvals.length - 1];
-              return (
-                <div key={i.id} className="rounded-lg border border-gray-200 p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm font-medium">
-                      {statusLabel(String(i.type))}
-                      <span className="ml-2 text-xs text-gray-400">{i.model ?? ''}</span>
+          <div>
+            <div className="divide-y divide-gray-100 rounded-lg border border-gray-200">
+              {pageItems.map((i) => {
+                const lastApproval = i.approvals?.[i.approvals.length - 1];
+                const isOpen = expanded.has(i.id);
+                return (
+                  <div key={i.id}>
+                    <div
+                      className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3 hover:bg-gray-50"
+                      onClick={() => toggle(i.id)}
+                    >
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className={`text-xs text-gray-400 transition-transform ${isOpen ? 'rotate-90' : ''}`}>▶</span>
+                        <span className="truncate text-sm font-medium">{statusLabel(String(i.type))}</span>
+                        {i.model && <span className="truncate text-xs text-gray-400">{i.model}</span>}
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {lastApproval ? (
+                          <Badge color={statusColor(lastApproval.status)}>{statusLabel(lastApproval.status)}</Badge>
+                        ) : (
+                          <Badge color="yellow">Pendente revisão</Badge>
+                        )}
+                        <span className="text-xs text-gray-400">{formatDateTime(i.created_at)}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {lastApproval ? (
-                        <Badge color={statusColor(lastApproval.status)}>{statusLabel(lastApproval.status)}</Badge>
-                      ) : (
-                        <Badge color="yellow">Pendente revisão</Badge>
-                      )}
-                      <span className="text-xs text-gray-400">{formatDateTime(i.created_at)}</span>
-                    </div>
+                    {isOpen && (
+                      <div className="border-t border-gray-100 bg-gray-50 px-4 py-3">
+                        {i.output?.structured || i.output?.rawText ? (
+                          <FormattedAIOutput output={i.output?.structured} rawText={i.output?.rawText} />
+                        ) : (
+                          <div className="text-sm italic text-gray-400">Sem conteúdo de saída.</div>
+                        )}
+                        {!lastApproval && (
+                          <div className="mt-3 flex gap-2" onClick={(e) => e.stopPropagation()}>
+                            <SecondaryButton onClick={() => review(i.id, 'APPROVED')} className="px-3 py-1.5 text-xs">Aprovar</SecondaryButton>
+                            <SecondaryButton onClick={() => review(i.id, 'REJECTED')} className="px-3 py-1 text-xs text-red-600">Rejeitar</SecondaryButton>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  {i.output?.structured && (
-                    <pre className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap rounded bg-gray-50 p-3 text-xs text-gray-700">
-                      {JSON.stringify(i.output.structured, null, 2)}
-                    </pre>
-                  )}
-                  {!i.output?.structured && i.output?.rawText && (
-                    <pre className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap rounded bg-gray-50 p-3 text-xs text-gray-700">{i.output.rawText}</pre>
-                  )}
-                  {!lastApproval && (
-                    <div className="mt-3 flex gap-2">
-                      <SecondaryButton onClick={() => review(i.id, 'APPROVED')} className="px-3 py-1 text-xs">Aprovar</SecondaryButton>
-                      <SecondaryButton onClick={() => review(i.id, 'REJECTED')} className="px-3 py-1 text-xs text-red-600">Rejeitar</SecondaryButton>
-                    </div>
-                  )}
+                );
+              })}
+            </div>
+            {totalPages > 1 && (
+              <div className="mt-4 flex items-center justify-between">
+                <span className="text-xs text-gray-500">
+                  {pageItems.length} de {interactions.length} · Página {safePage} de {totalPages}
+                </span>
+                <div className="flex items-center gap-2">
+                  <SecondaryButton disabled={safePage <= 1} onClick={() => setPage(safePage - 1)} className="px-3 py-1.5 text-xs">Anterior</SecondaryButton>
+                  <SecondaryButton disabled={safePage >= totalPages} onClick={() => setPage(safePage + 1)} className="px-3 py-1.5 text-xs">Próxima</SecondaryButton>
                 </div>
-              );
-            })}
+              </div>
+            )}
           </div>
         )}
       </Card>
@@ -635,13 +687,13 @@ function AuditTab({ processId }: { processId: string }) {
 
   return (
     <div className="overflow-x-auto rounded-lg border border-gray-200">
-      <table className="min-w-full divide-y divide-gray-200 text-sm">
-        <thead className="bg-gray-50">
+      <table className="table-legal min-w-full">
+        <thead className="bg-gray-50/70">
           <tr>
-            <th className="px-4 py-2 text-left font-medium text-gray-500">Data</th>
-            <th className="px-4 py-2 text-left font-medium text-gray-500">Ação</th>
-            <th className="px-4 py-2 text-left font-medium text-gray-500">Usuário</th>
-            <th className="px-4 py-2 text-left font-medium text-gray-500">Detalhes</th>
+            <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-500">Data</th>
+            <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-500">Ação</th>
+            <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-500">Usuário</th>
+            <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-500">Detalhes</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">

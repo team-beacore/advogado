@@ -1,0 +1,77 @@
+# Ambiente de desenvolvimento — Plataforma Jurídica
+# Uso: docker compose -f docker-compose.yml up -d
+# Não colocar credenciais aqui; usar .env (ver .env.example)
+name: advogado
+
+services:
+  api:
+    image: node:20-alpine
+    container_name: advogado-api
+    working_dir: /app
+    volumes:
+      - ./apps/api:/app
+    command: sh -c "npm ci && npm run db:migrate && npm run dev"
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgres://advogado:advogado@postgres:5432/advogado
+      STORAGE_DRIVER: local
+      STORAGE_DIR: ./data/storage
+      CORS_ORIGIN: http://localhost:5173
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL:-}
+      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:-}
+      SUPER_ADMIN_NAME: ${SUPER_ADMIN_NAME:-}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - internal
+
+  web:
+    image: node:20-alpine
+    container_name: advogado-web
+    working_dir: /app
+    volumes:
+      - ./apps/web:/app
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0"
+    environment:
+      VITE_API_URL: http://localhost:3000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+    networks:
+      - internal
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: advogado-postgres
+    environment:
+      POSTGRES_USER: advogado
+      POSTGRES_PASSWORD: advogado
+      POSTGRES_DB: advogado
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U advogado"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - internal
+
+volumes:
+  pgdata:
+
+networks:
+  internal:
+    driver: bridge

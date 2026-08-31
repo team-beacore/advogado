@@ -65,13 +65,13 @@ export default function Leads() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Leads</h1>
+      <div className="mb-7 flex flex-wrap items-end justify-between gap-3 border-b border-gray-200/80 pb-5">
+        <h1 className="page-title">Leads</h1>
         <Button onClick={() => setShowCreate(true)}>Novo lead</Button>
       </div>
 
       <div className="mb-4">
-        <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="max-w-44">
+        <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="sm:max-w-48">
           <option value="">Todos</option>
           <option value="NEW">Novo</option>
           <option value="CONTACTED">Contatado</option>
@@ -85,13 +85,13 @@ export default function Leads() {
       <ErrorAlert error={error} />
 
       {loading ? (
-        <div className="text-gray-500">Carregando…</div>
+        <div className="flex items-center gap-2.5 text-sm text-gray-500"><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-200 border-t-brand-600" />Carregando…</div>
       ) : items.length === 0 ? (
-        <EmptyState title="Nenhum lead cadastrado." hint="Crie leads manualmente. A entrada automática via WhatsApp será preparada futuramente." />
+        <EmptyState title="Nenhum lead cadastrado." hint="Crie leads manualmente." />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((l) => (
-            <div key={l.id} className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+            <div key={l.id} className="surface p-5">
               <div className="flex items-start justify-between">
                 <div className="font-medium">{l.name}</div>
                 <Badge color={statusColor(l.status)}>{statusLabel(l.status)}</Badge>
@@ -116,22 +116,22 @@ export default function Leads() {
       )}
 
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title="Novo lead">
-        <form onSubmit={create} className="space-y-3">
+        <form onSubmit={create} className="space-y-4">
           <ErrorAlert error={formError} />
           <div>
-            <label className="mb-1 block text-sm font-medium">Nome *</label>
+            <label className="field-label">Nome *</label>
             <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Telefone</label>
+            <label className="field-label">Telefone</label>
             <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Origem</label>
-            <Input value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} placeholder="Ex.: WhatsApp, indicação…" />
+            <label className="field-label">Origem</label>
+            <Input value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} placeholder="Ex.: indicação…" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Assunto</label>
+            <label className="field-label">Assunto</label>
             <Input value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} />
           </div>
           <Button type="submit" className="w-full">Criar</Button>

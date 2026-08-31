@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import type { Request } from 'express';
 import { createPublicationSchema, updatePublicationSchema } from '@advogado/shared';
-import { requireAuth, requireOrg, getOrgId } from '../auth/middleware';
+import { requireAuth, requireOrg, getOrgId, requirePermission } from '../auth/middleware';
+import { PERMISSIONS } from '@advogado/shared';
 import * as publicationService from '../services/publicationService';
 import { assertCasePermission, getCaseAccess } from '../services/caseService';
 import { getPool } from '../db/client';
@@ -29,7 +30,7 @@ const router = Router();
 
 router.use(requireAuth, requireOrg);
 
-router.get('/', async (req, res, next) => {
+router.get('/', requirePermission(PERMISSIONS.PUBLICATIONS_READ), async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
     const result = await publicationService.listPublications(orgId, {
@@ -42,7 +43,7 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/', async (req, res, next) => {
+router.post('/', requirePermission(PERMISSIONS.PUBLICATIONS_CREATE), async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
     const data = createPublicationSchema.parse(req.body);

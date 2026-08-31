@@ -58,27 +58,26 @@ export async function createPublication(organizationId: string, input: Publicati
       [
         organizationId,
         input.processId,
-        userId,
+        null,
         'Intimação pendente de análise',
         `Uma intimação registrada em ${new Date().toLocaleDateString('pt-BR')} aguarda análise.${due ? ` Prazo possível: ${due.toLocaleDateString('pt-BR')}.` : ''}`,
       ],
     );
     const notif = notifRes.rows[0];
-    if (userId) {
-      try {
-        const userRes = await pool.query('SELECT id, email FROM users WHERE id = $1', [userId]);
-        const user = userRes.rows[0];
-        const { dispatchNotification } = await import('../notify/service');
-        void dispatchNotification(organizationId, notif.id, {
-          userId,
-          recipientEmail: user?.email ?? null,
-          recipientPhone: null,
-          title: notif.title,
-          description: notif.description,
-        });
-      } catch {
-        // envio por canal nunca deve derrubar o registro da intimação
-      }
+    try {
+      const { dispatchToUserResponsible } = await import('../notify/service');
+      await dispatchToUserResponsible(organizationId, notif.id, input.processId, {
+        title: notif.title,
+        description: notif.description,
+      });
+    } catch {
+      // envio por canal nunca deve derrubar o registro da intimação
+    }
+    try {
+      const { notifyClientOfUpdate } = await import('../notify/service');
+      await notifyClientOfUpdate(organizationId, input.processId);
+    } catch {
+      // envio ao cliente nunca deve derrubar o registro da intimação
     }
   }
 

@@ -102,8 +102,8 @@ export default function Finance() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Financeiro</h1>
+      <div className="mb-7 flex flex-wrap items-end justify-between gap-3 border-b border-gray-200/80 pb-5">
+        <h1 className="page-title">Financeiro</h1>
         <div className="flex gap-2">
           <SecondaryButton onClick={() => setShowContract(true)}>Novo contrato</SecondaryButton>
           <Button onClick={() => setShowInvoice(true)}>Nova cobrança</Button>
@@ -137,7 +137,7 @@ export default function Finance() {
       )}
 
       {loading ? (
-        <div className="text-gray-500">Carregando…</div>
+        <div className="flex items-center gap-2.5 text-sm text-gray-500"><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-200 border-t-brand-600" />Carregando…</div>
       ) : (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <Card title={`Contratos (${contracts.length})`}>
@@ -146,7 +146,7 @@ export default function Finance() {
             ) : (
               <ul className="space-y-2">
                 {contracts.map((c) => (
-                  <li key={c.id} className="flex items-center justify-between rounded border border-gray-100 px-3 py-2 text-sm">
+                  <li key={c.id} className="flex items-center justify-between rounded-lg border border-gray-200 px-3.5 py-3 transition-colors hover:bg-gray-50 text-sm">
                     <div>
                       <div className="font-medium">{c.title}</div>
                       <div className="text-xs text-gray-500">{c.client_name ?? 'Sem cliente'} · {currency(c.total_value)}</div>
@@ -164,7 +164,7 @@ export default function Finance() {
             ) : (
               <ul className="space-y-2">
                 {invoices.map((i) => (
-                  <li key={i.id} className="flex items-center justify-between rounded border border-gray-100 px-3 py-2 text-sm">
+                  <li key={i.id} className="flex items-center justify-between rounded-lg border border-gray-200 px-3.5 py-3 transition-colors hover:bg-gray-50 text-sm">
                     <div>
                       <div className="font-medium">{i.description}</div>
                       <div className="text-xs text-gray-500">
@@ -175,7 +175,7 @@ export default function Finance() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge color={statusColor(i.status)}>{statusLabel(i.status)}</Badge>
-                      <button onClick={() => openInvoice(i.id)} className="text-brand-600 hover:underline">Detalhes</button>
+                      <button onClick={() => openInvoice(i.id)} className="link-quiet">Detalhes</button>
                     </div>
                   </li>
                 ))}
@@ -186,14 +186,14 @@ export default function Finance() {
       )}
 
       <Modal open={showContract} onClose={() => setShowContract(false)} title="Novo contrato">
-        <form onSubmit={createContract} className="space-y-3">
+        <form onSubmit={createContract} className="space-y-4">
           <ErrorAlert error={formError} />
           <div>
-            <label className="mb-1 block text-sm font-medium">Título *</label>
+            <label className="field-label">Título *</label>
             <Input value={contractForm.title} onChange={(e) => setContractForm({ ...contractForm, title: e.target.value })} required />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Cliente</label>
+            <label className="field-label">Cliente</label>
             <Select value={contractForm.clientId} onChange={(e) => setContractForm({ ...contractForm, clientId: e.target.value })}>
               <option value="">Sem cliente</option>
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -201,11 +201,11 @@ export default function Finance() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium">Valor total</label>
+              <label className="field-label">Valor total</label>
               <Input type="number" step="0.01" min="0" value={contractForm.totalValue} onChange={(e) => setContractForm({ ...contractForm, totalValue: e.target.value })} />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Status</label>
+              <label className="field-label">Status</label>
               <Select value={contractForm.status} onChange={(e) => setContractForm({ ...contractForm, status: e.target.value })}>
                 <option value="DRAFT">Rascunho</option>
                 <option value="ACTIVE">Ativo</option>
@@ -219,14 +219,14 @@ export default function Finance() {
       </Modal>
 
       <Modal open={showInvoice} onClose={() => setShowInvoice(false)} title="Nova cobrança">
-        <form onSubmit={createInvoice} className="space-y-3">
+        <form onSubmit={createInvoice} className="space-y-4">
           <ErrorAlert error={formError} />
           <div>
-            <label className="mb-1 block text-sm font-medium">Descrição *</label>
+            <label className="field-label">Descrição *</label>
             <Input value={invoiceForm.description} onChange={(e) => setInvoiceForm({ ...invoiceForm, description: e.target.value })} required />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Contrato</label>
+            <label className="field-label">Contrato</label>
             <Select value={invoiceForm.contractId} onChange={(e) => setInvoiceForm({ ...invoiceForm, contractId: e.target.value })}>
               <option value="">Cobrança avulsa</option>
               {contracts.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
@@ -234,16 +234,16 @@ export default function Finance() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium">Valor</label>
+              <label className="field-label">Valor</label>
               <Input type="number" step="0.01" min="0" value={invoiceForm.amount} onChange={(e) => setInvoiceForm({ ...invoiceForm, amount: e.target.value })} />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Parcelas</label>
+              <label className="field-label">Parcelas</label>
               <Input type="number" min="1" value={invoiceForm.installmentCount} onChange={(e) => setInvoiceForm({ ...invoiceForm, installmentCount: e.target.value })} />
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium">Vencimento</label>
+            <label className="field-label">Vencimento</label>
             <Input type="datetime-local" value={invoiceForm.dueDate} onChange={(e) => setInvoiceForm({ ...invoiceForm, dueDate: e.target.value })} />
           </div>
           <Button type="submit" className="w-full">Criar cobrança</Button>
@@ -255,10 +255,10 @@ export default function Finance() {
           <div className="space-y-4">
             <ErrorAlert error={formError} />
             <div className="flex items-center justify-between">
-              <div className="text-sm font-medium">{selected.description}</div>
+              <div className="text-sm font-semibold text-gray-900">{selected.description}</div>
               <Badge color={statusColor(selected.status)}>{statusLabel(selected.status)}</Badge>
             </div>
-            <div className="text-sm text-gray-500">Valor: <b>{currency(selected.amount)}</b></div>
+            <div className="text-sm text-gray-600">Valor: <b>{currency(selected.amount)}</b></div>
             <div>
               <div className="mb-2 text-sm font-medium">Parcelas</div>
               {selected.installments.length === 0 ? (

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { aiDraftSchema } from '@advogado/shared';
-import { requireAuth, requireOrg, getOrgId } from '../auth/middleware';
+import { requireAuth, requireOrg, getOrgId, requirePermission } from '../auth/middleware';
+import { PERMISSIONS } from '@advogado/shared';
 import { AIService } from '../services/aiService';
 import { getAIProvider, getProviderInfo } from '../ai/registry';
 
@@ -21,7 +22,7 @@ router.get('/status', (_req, res) => {
   });
 });
 
-router.get('/interactions', async (req, res, next) => {
+router.get('/interactions', requirePermission(PERMISSIONS.AI_USE), async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
     const result = await createService().listInteractions(orgId, {
@@ -33,7 +34,7 @@ router.get('/interactions', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/processes/:processId/summarize', async (req, res, next) => {
+router.post('/processes/:processId/summarize', requirePermission(PERMISSIONS.AI_USE), async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
     const result = await createService().summarize(orgId, req.params.processId!, req.user!.id, req.ip, req.user!.role);
@@ -47,7 +48,7 @@ router.post('/processes/:processId/summarize', async (req, res, next) => {
   }
 });
 
-router.post('/processes/:processId/analyze-publication/:publicationId', async (req, res, next) => {
+router.post('/processes/:processId/analyze-publication/:publicationId', requirePermission(PERMISSIONS.AI_USE), async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
     const result = await createService().analyzePublication(orgId, req.params.processId!, req.params.publicationId!, req.user!.id, req.ip, req.user!.role);
@@ -61,7 +62,7 @@ router.post('/processes/:processId/analyze-publication/:publicationId', async (r
   }
 });
 
-router.post('/processes/:processId/draft', async (req, res, next) => {
+router.post('/processes/:processId/draft', requirePermission(PERMISSIONS.AI_USE), async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
     const data = aiDraftSchema.parse(req.body);
@@ -80,7 +81,7 @@ router.post('/processes/:processId/draft', async (req, res, next) => {
   }
 });
 
-router.post('/interactions/:interactionId/review', async (req, res, next) => {
+router.post('/interactions/:interactionId/review', requirePermission(PERMISSIONS.AI_USE), async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
     const { status, editedOutput } = req.body;

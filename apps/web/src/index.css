@@ -2,10 +2,121 @@
 @tailwind components;
 @tailwind utilities;
 
-html {
-  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-gray-50 text-gray-800 antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'ss01';
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display text-gray-900;
+    letter-spacing: -0.018em;
+  }
+
+  /* Números tabulares para valores, datas e prazos */
+  table,
+  time {
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand-500/40 ring-offset-1 ring-offset-white;
+  }
+
+  ::selection {
+    @apply bg-brand-100 text-brand-900;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full border-4 border-solid border-transparent bg-gray-300 bg-clip-content;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400 bg-clip-content;
+  }
 }
 
-body {
-  @apply bg-gray-50 text-gray-900 antialiased;
+@layer components {
+  /* Rótulos de seção / metadados */
+  .eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400;
+  }
+
+  .page-title {
+    @apply font-display text-[1.55rem] font-semibold tracking-tightest text-gray-900 sm:text-[1.75rem];
+  }
+
+  .page-subtitle {
+    @apply mt-1 text-sm leading-relaxed text-gray-500;
+  }
+
+  .section-title {
+    @apply font-display text-sm font-semibold tracking-tight text-gray-900;
+  }
+
+  .field-label {
+    @apply mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-500;
+  }
+
+  .meta {
+    @apply text-xs text-gray-500;
+  }
+
+  .surface {
+    @apply rounded-xl border border-gray-200/90 bg-white shadow-card;
+  }
+
+  .hairline {
+    @apply border-gray-200/80;
+  }
+
+  /* Tabelas institucionais */
+  .table-legal {
+    @apply w-full border-collapse text-sm;
+  }
+  .table-legal thead th {
+    @apply whitespace-nowrap border-b border-gray-200 bg-gray-50/70 px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-500;
+  }
+  .table-legal tbody td {
+    @apply border-b border-gray-100 px-4 py-3.5 align-middle text-gray-700;
+  }
+  .table-legal tbody tr {
+    @apply transition-colors hover:bg-brand-50/40;
+  }
+  .table-legal tbody tr:last-child td {
+    @apply border-b-0;
+  }
+
+  .skeleton {
+    @apply relative overflow-hidden rounded-md bg-gray-100;
+  }
+  .skeleton::after {
+    content: '';
+    @apply absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/70 to-transparent;
+    animation: shimmer 1.6s infinite;
+  }
+
+  .link-quiet {
+    @apply font-medium text-brand-700 underline-offset-4 transition-colors hover:text-brand-800 hover:underline;
+  }
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
 }

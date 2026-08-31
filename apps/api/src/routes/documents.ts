@@ -2,7 +2,8 @@ import { Router } from 'express';
 import type { Request } from 'express';
 import multer from 'multer';
 import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE } from '@advogado/shared';
-import { requireAuth, requireOrg, getOrgId } from '../auth/middleware';
+import { requireAuth, requireOrg, getOrgId, requirePermission } from '../auth/middleware';
+import { PERMISSIONS } from '@advogado/shared';
 import * as documentService from '../services/documentService';
 import { getStorage } from '../storage';
 import { auditLog } from '../audit/audit';
@@ -20,7 +21,7 @@ const upload = multer({
 
 router.use(requireAuth, requireOrg);
 
-router.get('/', async (req, res, next) => {
+router.get('/', requirePermission(PERMISSIONS.DOCUMENTS_READ), async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
     const result = await documentService.listDocuments(orgId, {
@@ -33,7 +34,7 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/', (req, res, next) => {
+router.post('/', requirePermission(PERMISSIONS.DOCUMENTS_CREATE), (req, res, next) => {
   upload.single('file')(req, res, async (err) => {
     if (err) {
       if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {

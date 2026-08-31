@@ -14,6 +14,8 @@ import dashboardRoutes from './routes/dashboard';
 import settingsRoutes from './routes/settings';
 import financeRoutes from './routes/finance';
 import captureRoutes from './routes/capture';
+import portalRoutes from './routes/portal';
+import superAdminRoutes from './routes/superadmin';
 import { requireAuth } from './auth/middleware';
 import { getEnv } from './config';
 import { getPool } from './db/client';
@@ -75,6 +77,8 @@ export function createApp() {
   app.use('/api/settings', settingsRoutes);
   app.use('/api/finance', financeRoutes);
   app.use('/api/capture', captureRoutes);
+  app.use('/api/portal', portalRoutes);
+  app.use('/api/superadmin', superAdminRoutes);
 
   // Error handler
   app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {

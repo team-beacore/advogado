@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import type { Request } from 'express';
 import { createTaskSchema, updateTaskSchema } from '@advogado/shared';
-import { requireAuth, requireOrg, getOrgId } from '../auth/middleware';
+import { requireAuth, requireOrg, getOrgId, requirePermission } from '../auth/middleware';
+import { PERMISSIONS } from '@advogado/shared';
 import * as taskService from '../services/taskService';
 import { assertCasePermission } from '../services/caseService';
 
@@ -24,7 +25,7 @@ const router = Router();
 
 router.use(requireAuth, requireOrg);
 
-router.get('/', async (req, res, next) => {
+router.get('/', requirePermission(PERMISSIONS.TASKS_READ), async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
     const view = typeof req.query.view === 'string' ? req.query.view : undefined;
@@ -40,7 +41,7 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.get('/summary', async (req, res, next) => {
+router.get('/summary', requirePermission(PERMISSIONS.TASKS_READ), async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
     const summary = await taskService.getTasksByView(orgId);
@@ -48,7 +49,7 @@ router.get('/summary', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/', async (req, res, next) => {
+router.post('/', requirePermission(PERMISSIONS.TASKS_CREATE), async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
     const data = createTaskSchema.parse(req.body);

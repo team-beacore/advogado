@@ -1,12 +1,35 @@
 import { Router } from 'express';
-import { updateNotificationChannelSchema } from '@advogado/shared';
-import { requireAuth, requireOrg, getOrgId, requireRole } from '../auth/middleware';
+import { userNotificationPreferencesSchema } from '@advogado/shared';
+import { PERMISSIONS } from '@advogado/shared';
+import { requireAuth, requireOrg, getOrgId, requirePermission } from '../auth/middleware';
 import * as notificationService from '../services/notificationService';
 import * as notifyService from '../notify/service';
+import { getNotificationPreferences, saveNotificationPreferences } from '../services/preferencesService';
 
 const router = Router();
 
 router.use(requireAuth, requireOrg);
+
+router.get('/preferences', async (req, res, next) => {
+  try {
+    const prefs = await getNotificationPreferences(req.user!.id);
+    res.json(prefs);
+  } catch (err) { next(err); }
+});
+
+router.put('/preferences', async (req, res, next) => {
+  try {
+    const data = userNotificationPreferencesSchema.parse(req.body);
+    const prefs = await saveNotificationPreferences(req.user!.id, data, req.user!.id, req.ip);
+    res.json(prefs);
+  } catch (err: unknown) {
+    if (err && typeof err === 'object' && 'issues' in err) {
+      res.status(400).json({ code: 'VALIDATION', message: 'Dados inválidos.', details: (err as { issues: unknown }).issues });
+      return;
+    }
+    next(err);
+  }
+});
 
 router.get('/', async (req, res, next) => {
   try {
@@ -36,13 +59,15 @@ router.get('/channels/status', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.put('/channels', requireRole('ADMIN'), async (req, res, next) => {
+router.put('/channels', requirePermission(PERMISSIONS.NOTIFICATIONS_MANAGE), async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
-    const data = updateNotificationChannelSchema.parse(req.body);
-    const config = { enabled: data.enabled, ...data.config };
-    await notifyService.saveChannelConfig(orgId, data.channel, config);
-    res.json({ ok: true, channel: data.channel });
+    const { channel, enabled } = req.body;
+    if (!channel) { res.status(400).json({ code: 'VALIDATION', message: 'channel é obrigatório.' }); return; }
+    // ADMIN pode apenas ativar/desativar; a configuração técnica é definida pelo SUPER ADMIN
+    const existing = await notifyService.getChannelConfig(orgId, channel);
+    await notifyService.saveChannelConfig(orgId, channel, { ...(existing ?? {}), enabled: Boolean(enabled) });
+    res.json({ ok: true, channel });
   } catch (err: unknown) {
     if (err && typeof err === 'object' && 'issues' in err) {
       res.status(400).json({ code: 'VALIDATION', message: 'Dados inválidos.', details: (err as { issues: unknown }).issues });
