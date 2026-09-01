@@ -29,9 +29,9 @@ export default function Publications() {
   const [processes, setProcesses] = useState<Array<{ id: string; title: string }>>([]);
   const [form, setForm] = useState({ processId: '', source: '', content: '', externalReference: '', possibleDueDate: '', availabilityDate: '' });
   const [formError, setFormError] = useState<unknown>(null);
-  const [captureStatus, setCaptureStatus] = useState<Array<{ name: string; configured: boolean }>>([]);
+  const [captureStatus, setCaptureStatus] = useState<Array<{ source: string; configured: boolean; implemented: boolean }>>([]);
   const [capturing, setCapturing] = useState(false);
-  const [captureResult, setCaptureResult] = useState<{ totalCreated: number; totalSkipped: number; runs: Array<{ adapter: string; status: string }> } | null>(null);
+  const [captureResult, setCaptureResult] = useState<{ imported: number; duplicate: number; errors: number } | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -47,7 +47,7 @@ export default function Publications() {
 
   useEffect(() => {
     void apiGet<{ items: Array<{ id: string; title: string }> }>('/api/processes').then((r) => setProcesses(r.items)).catch(() => {});
-    void apiGet<{ adapters: Array<{ name: string; configured: boolean }> }>('/api/capture/status').then((r) => setCaptureStatus(r.adapters)).catch(() => {});
+    void apiGet<{ adapters: Array<{ source: string; configured: boolean; implemented: boolean }> }>('/api/capture/status').then((r) => setCaptureStatus(r.adapters)).catch(() => {});
   }, []);
 
   const runCapture = async () => {
@@ -55,7 +55,7 @@ export default function Publications() {
     setCaptureResult(null);
     setError(null);
     try {
-      const res = await apiPost<{ totalCreated: number; totalSkipped: number; runs: Array<{ adapter: string; status: string }> }>('/api/capture/run');
+      const res = await apiPost<{ imported: number; duplicate: number; errors: number }>('/api/capture/run', { source: 'DEMO' });
       setCaptureResult(res);
       void load();
     } catch (e) { setError(e); }
@@ -94,7 +94,7 @@ export default function Publications() {
         <div className="flex gap-2">
           {captureStatus.some((a) => a.configured) && (
             <SecondaryButton onClick={runCapture} disabled={capturing} className="shrink-0">
-              {capturing ? 'Capturando…' : 'Importar dos tribunais'}
+              {capturing ? 'Capturando…' : 'Importar demonstração'}
             </SecondaryButton>
           )}
           <Button onClick={() => setShowCreate(true)}>Registrar intimação</Button>
@@ -103,7 +103,7 @@ export default function Publications() {
 
       {captureResult && (
         <div className="mb-4 rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-          Captura concluída: {captureResult.totalCreated} nova(s) importada(s), {captureResult.totalSkipped} ignorada(s).
+          Captura concluída: {captureResult.imported} nova(s) importada(s), {captureResult.duplicate} duplicada(s), {captureResult.errors} erro(s).
         </div>
       )}
 

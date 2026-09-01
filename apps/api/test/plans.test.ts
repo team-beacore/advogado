@@ -200,7 +200,7 @@ describe('Plano SOLO x OFFICE, senha, canais e captura', () => {
        ON CONFLICT (organization_id, key) DO UPDATE SET value = EXCLUDED.value`,
       [session.orgId, JSON.stringify({ enabled: true, login: 'original-login', password: 'secret', baseUrl: 'https://pje.original.com' })],
     );
-    await request(app).put('/api/capture/config').set('Cookie', session.cookie).send({ adapter: 'PJE', enabled: false, login: 'hacked', password: 'hacked', baseUrl: 'https://hacker.com' }).expect(200);
+    await request(app).put('/api/capture/config').set('Cookie', session.cookie).send({ source: 'PJE', enabled: false, login: 'hacked', password: 'hacked', baseUrl: 'https://hacker.com' }).expect(200);
     const cfg = await pool.query('SELECT value FROM settings WHERE organization_id = $1 AND key = $2', [session.orgId, 'integration.capture.pje']);
     assert.equal(cfg.rows[0].value.enabled, false);
     assert.equal(cfg.rows[0].value.login, 'original-login');
@@ -216,9 +216,9 @@ describe('Plano SOLO x OFFICE, senha, canais e captura', () => {
        ON CONFLICT (organization_id, key) DO UPDATE SET value = EXCLUDED.value`,
       [session.orgId, JSON.stringify({ enabled: true, login: 'l', password: 'p', baseUrl: 'u' })],
     );
-    await request(app).put('/api/capture/config').set('Cookie', session.cookie).send({ adapter: 'PJE', enabled: false }).expect(200);
+    await request(app).put('/api/capture/config').set('Cookie', session.cookie).send({ source: 'PJE', enabled: false }).expect(200);
     const list = await request(app).get('/api/capture/config').set('Cookie', session.cookie).expect(200);
-    assert.equal(list.body.find((c: { adapter: string }) => c.adapter === 'PJE').enabled, false);
+    assert.equal(list.body.find((c: { source: string }) => c.source === 'PJE').enabled, false);
   });
 
   // ============ IA / secrets ============
