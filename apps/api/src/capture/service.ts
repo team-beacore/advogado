@@ -71,28 +71,43 @@ async function finishRun(
 }
 
 /** Busca processo pela número (escopo da organização). */
-async function findProcessByNumber(organizationId: string, processNumber: string): Promise<{ id: string; created: boolean }> {
+async function findProcessByNumber(organizationId: string, processNumber: string, userId?: string | null): Promise<{ id: string; created: boolean }> {
   const pool = getPool();
   const existing = await pool.query('SELECT id FROM cases WHERE organization_id = $1 AND process_number = $2', [organizationId, processNumber]);
   if (existing.rows.length > 0) return { id: existing.rows[0].id, created: false };
 
-  // Normaliza título básico a partir do número quando não houver melhor informação
   const res = await pool.query(
-    `INSERT INTO cases (organization_id, title, process_number) VALUES ($1, $2, $3) RETURNING id`,
-    [organizationId, `Processo ${processNumber}`, processNumber],
+    `INSERT INTO cases (organization_id, title, process_number, responsible_id) VALUES ($1, $2, $3, $4) RETURNING id`,
+    [organizationId, `Processo ${processNumber}`, processNumber, userId ?? null],
   );
-  return { id: res.rows[0].id, created: true };
+  const caseId = res.rows[0].id;
+  if (userId) {
+    await pool.query(
+      `INSERT INTO case_members (case_id, user_id, role, can_view, can_edit, can_manage)
+       VALUES ($1, $2, 'ADMIN', TRUE, TRUE, TRUE) ON CONFLICT (case_id, user_id) DO NOTHING`,
+      [caseId, userId],
+    );
+  }
+  return { id: caseId, created: true };
 }
 
-async function findProcessByNumberWithTitle(organizationId: string, np: { processNumber: string; title?: string | null }): Promise<{ id: string; created: boolean }> {
+async function findProcessByNumberWithTitle(organizationId: string, np: { processNumber: string; title?: string | null }, userId?: string | null): Promise<{ id: string; created: boolean }> {
   const pool = getPool();
   const existing = await pool.query('SELECT id FROM cases WHERE organization_id = $1 AND process_number = $2', [organizationId, np.processNumber]);
   if (existing.rows.length > 0) return { id: existing.rows[0].id, created: false };
   const res = await pool.query(
-    `INSERT INTO cases (organization_id, title, process_number) VALUES ($1, $2, $3) RETURNING id`,
-    [organizationId, np.title?.trim() || `Processo ${np.processNumber}`, np.processNumber],
+    `INSERT INTO cases (organization_id, title, process_number, responsible_id) VALUES ($1, $2, $3, $4) RETURNING id`,
+    [organizationId, np.title?.trim() || `Processo ${np.processNumber}`, np.processNumber, userId ?? null],
   );
-  return { id: res.rows[0].id, created: true };
+  const caseId = res.rows[0].id;
+  if (userId) {
+    await pool.query(
+      `INSERT INTO case_members (case_id, user_id, role, can_view, can_edit, can_manage)
+       VALUES ($1, $2, 'ADMIN', TRUE, TRUE, TRUE) ON CONFLICT (case_id, user_id) DO NOTHING`,
+      [caseId, userId],
+    );
+  }
+  return { id: caseId, created: true };
 }
 
 /** Verifica se uma publicação já existe (idempotência) usando referência externa ou hash determinístico. */
@@ -237,7 +252,7 @@ export async function runCapture(
   const processIds = new Map<string, string>();
   for (const proc of normalizedProcesses) {
     try {
-      const found = await findProcessByNumberWithTitle(organizationId, proc);
+      const found = await findProcessByNumberWithTitle(organizationId, proc, userId);
       processIds.set(proc.processNumber, found.id);
       if (found.created) counters.imported += 1;
       else counters.duplicate += 1;
