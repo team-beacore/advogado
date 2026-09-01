@@ -78,6 +78,7 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error('FATAL:', e.message);
+  const msg = e instanceof Error ? e.message : String(e ?? 'erro desconhecido');
+  console.error('FATAL:', msg);
   process.exit(1);
 });

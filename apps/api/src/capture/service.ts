@@ -5,7 +5,8 @@ import { createPublication } from '../services/publicationService';
 import { addEvent } from '../events/timeline';
 import { auditLog } from '../audit/audit';
 import { errors } from '../errors';
-import type { CaptureAdapter } from './types';
+import { CAPTURE_ERROR_CODES, CAPTURE_ERROR_MESSAGES } from './types';
+import type { CaptureAdapter, CaptureErrorCode } from './types';
 import type { CaptureSource } from '@advogado/shared';
 
 export type CaptureRunStatus = 'RUNNING' | 'SUCCESS' | 'PARTIAL' | 'FAILED';
@@ -30,6 +31,7 @@ export interface CaptureRunResult {
   publicationsFound: number;
   steps: Array<{ name: string; status: 'OK' | 'FAILED'; message?: string }>;
   errorMessage?: string | null;
+  errorCode?: CaptureErrorCode | null;
 }
 
 async function getSourceConfig(organizationId: string, source: string): Promise<Record<string, unknown> | null> {
@@ -133,6 +135,24 @@ export interface RunCaptureOptions {
 }
 
 /**
+ * Classifica um erro em um CaptureErrorCode padronizado.
+ * Usado quando o adapter não informa explicitamente o código.
+ */
+function inferErrorCode(err: unknown, source: string, config: Record<string, unknown> | null): CaptureErrorCode {
+  const msg = err instanceof Error ? err.message.toLowerCase() : '';
+  if (/\brate.?limit|429|too many requests/i.test(msg)) return CAPTURE_ERROR_CODES.RATE_LIMITED;
+  if (/\btimeout|timed out|abort/i.test(msg)) return CAPTURE_ERROR_CODES.TIMEOUT;
+  if (/authentication|auth|login|credential|401|403/i.test(msg)) return CAPTURE_ERROR_CODES.AUTHENTICATION_FAILED;
+  if (!config || !Object.keys(config).length) return CAPTURE_ERROR_CODES.INVALID_CONFIGURATION;
+  return CAPTURE_ERROR_CODES.SOURCE_UNAVAILABLE;
+}
+
+function captureError(errorCode: CaptureErrorCode, detail?: string): string {
+  const base = CAPTURE_ERROR_MESSAGES[errorCode];
+  return detail ? `${base} ${detail}` : base;
+}
+
+/**
  * Executa a captura de uma única fonte para uma organização.
  * Reutiliza publicationService (notificações), timeline e auditoria existentes.
  * A captura é idempotente por processo/publicação/movimentação.
@@ -162,7 +182,7 @@ export async function runCapture(
     steps.push({ name: 'Disponibilidade', status: 'FAILED', message: `Fonte ${adapter.label} ainda não implementada.` });
     await finishRun(runId, 'FAILED', counters, `Fonte ${adapter.label} ainda não implementada.`, { mode, implemented: false });
     void auditLog({ organizationId, userId, action: 'CAPTURE_RUN', entity: 'capture_run', entityId: runId, after: { source, mode, status: 'FAILED', reason: 'NOT_IMPLEMENTED' }, ip, metadata: { implemented: false } });
-    return { runId, source, status: 'FAILED', found: 0, imported: 0, duplicate: 0, errors: 1, processesFound: 0, movementsFound: 0, publicationsFound: 0, steps, errorMessage: `Fonte ${adapter.label} ainda não implementada.` };
+    return { runId, source, status: 'FAILED', found: 0, imported: 0, duplicate: 0, errors: 1, processesFound: 0, movementsFound: 0, publicationsFound: 0, steps, errorMessage: `Fonte ${adapter.label} ainda não implementada.`, errorCode: CAPTURE_ERROR_CODES.SOURCE_UNAVAILABLE };
   }
 
   // 2) Configuração
@@ -171,7 +191,7 @@ export async function runCapture(
     steps.push({ name: 'Configuração', status: 'FAILED', message: `Fonte ${adapter.label} não configurada.` });
     await finishRun(runId, 'FAILED', counters, `Fonte ${adapter.label} não configurada.`, { mode });
     void auditLog({ organizationId, userId, action: 'CAPTURE_RUN', entity: 'capture_run', entityId: runId, after: { source, mode, status: 'FAILED', reason: 'NOT_CONFIGURED' }, ip });
-    return { runId, source, status: 'FAILED', found: 0, imported: 0, duplicate: 0, errors: 1, processesFound: 0, movementsFound: 0, publicationsFound: 0, steps, errorMessage: `Fonte ${adapter.label} não configurada.` };
+    return { runId, source, status: 'FAILED', found: 0, imported: 0, duplicate: 0, errors: 1, processesFound: 0, movementsFound: 0, publicationsFound: 0, steps, errorMessage: `Fonte ${adapter.label} não configurada.`, errorCode: CAPTURE_ERROR_CODES.INVALID_CONFIGURATION };
   }
 
   steps.push({ name: 'Disponibilidade', status: 'OK', message: `${adapter.label} disponível` });
@@ -195,9 +215,10 @@ export async function runCapture(
     const msg = e instanceof Error ? e.message : 'Falha ao consultar a fonte.';
     steps.push({ name: 'Consulta', status: 'FAILED', message: msg });
     counters.errors = 1;
-    await finishRun(runId, 'FAILED', counters, msg, { mode, retries: maxRetries });
-    void auditLog({ organizationId, userId, action: 'CAPTURE_RUN', entity: 'capture_run', entityId: runId, after: { source, mode, status: 'FAILED', reason: 'SOURCE_ERROR' }, ip, metadata: { error: msg } });
-    return { runId, source, status: 'FAILED', found: 0, imported: 0, duplicate: 0, errors: 1, processesFound: 0, movementsFound: 0, publicationsFound: 0, steps, errorMessage: msg };
+    const errorCode = inferErrorCode(e, source, config);
+    await finishRun(runId, 'FAILED', counters, msg, { mode, retries: maxRetries, errorCode });
+    void auditLog({ organizationId, userId, action: 'CAPTURE_RUN', entity: 'capture_run', entityId: runId, after: { source, mode, status: 'FAILED', reason: errorCode }, ip, metadata: { error: msg } });
+    return { runId, source, status: 'FAILED', found: 0, imported: 0, duplicate: 0, errors: 1, processesFound: 0, movementsFound: 0, publicationsFound: 0, steps, errorMessage: msg, errorCode };
   }
 
   // 4) Normalização
@@ -314,6 +335,7 @@ export async function runCapture(
     publicationsFound,
     steps,
     errorMessage: counters.errors > 0 ? 'Captura concluída com erros.' : null,
+    errorCode: (status as CaptureRunStatus) === 'FAILED' ? CAPTURE_ERROR_CODES.UNKNOWN_ERROR : null,
   };
 }
 

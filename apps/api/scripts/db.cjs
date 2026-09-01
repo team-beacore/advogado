@@ -72,7 +72,7 @@ if (cmd === 'start') {
       process.exit(0);
     });
   }).catch((e) => {
-    console.error('FATAL:', e.message);
+    console.error('FATAL:', e && e.message ? e.message : String(e));
     process.exit(1);
   });
 } else if (cmd === 'stop') {

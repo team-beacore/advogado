@@ -50,6 +50,7 @@ interface CaptureRunResult {
   publicationsFound: number;
   steps: CaptureStep[];
   errorMessage?: string | null;
+  errorCode?: string | null;
 }
 
 interface CaptureTestResult {
@@ -319,12 +320,23 @@ export default function Settings() {
                 const test = testResults[c.source];
                 const running = runningSource === c.source;
                 const testing = testingSource === c.source;
+                const modeBadge = c.mode === 'DEMO'
+                  ? { icon: '🟣', label: 'DEMONSTRAÇÃO', sub: 'Dados fictícios', cls: 'border-purple-200 bg-purple-50 text-purple-700' }
+                  : c.mode === 'PUBLIC'
+                    ? { icon: '🟢', label: 'PÚBLICO', sub: 'Fonte pública', cls: 'border-green-200 bg-green-50 text-green-700' }
+                    : { icon: '🔵', label: 'PRODUÇÃO', sub: 'Fonte autenticada', cls: 'border-blue-200 bg-blue-50 text-blue-700' };
                 return (
                   <div key={c.source} className="rounded border border-gray-200 p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm font-semibold text-gray-900">{c.source} <span className="text-xs font-normal text-gray-500">({c.mode})</span></div>
-                      <Badge color={c.implemented ? (c.configured ? 'green' : 'yellow') : 'gray'}>{statusIcon} {statusText}</Badge>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-sm font-semibold text-gray-900">{c.source}</div>
+                      <div className="flex items-center gap-2">
+                        <span className={`rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${modeBadge.cls}`} title={modeBadge.sub}>
+                          {modeBadge.icon} {modeBadge.label}
+                        </span>
+                        <Badge color={c.implemented ? (c.configured ? 'green' : 'yellow') : 'gray'}>{statusIcon} {statusText}</Badge>
+                      </div>
                     </div>
+                    <div className="mt-1 text-xs text-gray-500">{modeBadge.sub}</div>
                     <div className="mt-1 text-xs text-gray-500">
                       {c.implemented ? (c.configured ? (c.enabled ? 'Ativo' : 'Desativado') : 'Configuração feita pelo suporte técnico.') : 'Nenhuma implementação disponível para esta versão.'}
                     </div>
@@ -377,8 +389,7 @@ export default function Settings() {
                         <div className="mt-2 text-xs text-gray-600">
                           {result.processesFound} processos · {result.movementsFound} movimentações · {result.publicationsFound} publicações
                         </div>
-                        {result.errorMessage && <div className="mt-1.5 text-xs text-red-600">{result.errorMessage}</div>}
-                        {result.steps.length > 0 && (
+                        {result.errorMessage && <div className="mt-1.5 text-xs text-red-600">{result.errorMessage}</div>}                        {result.steps.length > 0 && (
                           <ul className="mt-2 space-y-1">
                             {result.steps.map((s) => (
                               <li key={s.name} className="flex items-start gap-2 text-xs">

@@ -27,10 +27,11 @@ export async function getChannelStatus(organizationId: string): Promise<Array<{ 
   const result: Array<{ channel: string; configured: boolean; enabled: boolean }> = [];
   for (const ch of channels) {
     const config = await getChannelConfig(organizationId, ch.name);
+    const isConfigured = ch.isConfigured(config);
     result.push({
       channel: ch.name,
-      configured: ch.isConfigured(config),
-      enabled: Boolean(config?.enabled),
+      configured: isConfigured,
+      enabled: config ? Boolean(config.enabled) : isConfigured,
     });
   }
   return result;
@@ -50,9 +51,12 @@ export async function dispatchNotification(organizationId: string, notificationI
 
   for (const ch of channels) {
     const config = await getChannelConfig(organizationId, ch.name);
-    const enabled = Boolean(config?.enabled);
     const recipient = opts.recipientEmail;
     if (!recipient) continue;
+
+    // Config por organização; quando não existe, o canal usa o SMTP global das env vars.
+    const isConfigured = ch.isConfigured(config);
+    const enabled = config ? Boolean(config.enabled) : isConfigured;
 
     const deliveryRes = await pool.query(
       `INSERT INTO notification_deliveries (organization_id, notification_id, user_id, channel, recipient, subject, body, status)
@@ -62,11 +66,11 @@ export async function dispatchNotification(organizationId: string, notificationI
     const delivery = deliveryRes.rows[0];
 
     let result: { channel: string; status: string; error?: string | null; externalReference?: string | null };
-    if (!enabled || !config || !ch.isConfigured(config)) {
+    if (!enabled || !isConfigured) {
       result = { channel: ch.name, status: 'NOT_CONFIGURED', error: `Canal ${ch.name} não configurado.` };
     } else {
       const message: ChannelMessage = { to: recipient, subject: opts.title, body: opts.description };
-      result = await ch.send(message, config);
+      result = await ch.send(message, config ?? {});
     }
     await pool.query(
       `UPDATE notification_deliveries SET status = $1, error = $2, external_reference = $3, sent_at = CASE WHEN $1 = 'SENT' THEN now() ELSE NULL END

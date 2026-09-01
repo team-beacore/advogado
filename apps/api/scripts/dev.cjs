@@ -35,8 +35,34 @@ async function runMigrations(pool) {
   }
 }
 
+function canConnect(port, database) {
+  return new Promise((resolve) => {
+    const net = require('node:net');
+    const sock = net.createConnection({ host: '127.0.0.1', port });
+    sock.setTimeout(3000);
+    sock.once('connect', () => { sock.end(); resolve(true); });
+    sock.once('timeout', () => { sock.destroy(); resolve(false); });
+    sock.once('error', () => { resolve(false); });
+  });
+}
+
 async function startDb() {
   mkdirSync(DATA_DIR, { recursive: true });
+  const alreadyRunning = await canConnect(port, database);
+  if (alreadyRunning) {
+    // Reutiliza o PostgreSQL embarcado já ativo (ex.: sessão anterior derrubada com força).
+    const { Pool } = require('pg');
+    const pool = new Pool({ connectionString: `postgres://${user}:${password}@127.0.0.1:${port}/${database}`, connectionTimeoutMillis: 5000 });
+    try {
+      await pool.query('SELECT 1');
+      await runMigrations(pool);
+      console.log(`Reusing PostgreSQL on 127.0.0.1:${port} (DB: ${database})`);
+      console.log('Migrations up to date.');
+    } finally {
+      await pool.end();
+    }
+    return null;
+  }
   const pg = new EmbeddedPostgres({ databaseDir: DATA_DIR, user, password, port, persistent: true, onLog: () => {}, onError: () => {} });
   const pgVersionFile = join(DATA_DIR, 'PG_VERSION');
   if (!existsSync(pgVersionFile)) {
@@ -75,17 +101,17 @@ async function main() {
     shell: true,
   });
   api.on('exit', async (code) => {
-    await pg.stop();
+    if (pg) { await pg.stop(); }
     process.exit(code ?? 0);
   });
   process.on('SIGINT', async () => {
     api.kill('SIGINT');
-    await pg.stop();
+    if (pg) { await pg.stop(); }
     process.exit(0);
   });
 }
 
 main().catch((e) => {
-  console.error('FATAL:', e.message);
+  console.error('FATAL:', e && e.message ? e.message : String(e));
   process.exit(1);
 });
