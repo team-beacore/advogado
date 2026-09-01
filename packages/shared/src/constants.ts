@@ -181,5 +181,11 @@ export const PAYMENT_METHODS = ['PIX', 'CREDIT_CARD', 'BOLETO', 'TRANSFER', 'CAS
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 export const NOTIFICATION_CHANNELS = ['EMAIL'] as const;
 export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
-export const CAPTURE_ADAPTERS = ['PJE', 'ESA', 'PROJUDI'] as const;
-export type CaptureAdapter = (typeof CAPTURE_ADAPTERS)[number];
+export const CAPTURE_SOURCES = ['DEMO', 'DATAJUD', 'PJE', 'ESAJ', 'PROJUDI'] as const;
+export type CaptureSource = (typeof CAPTURE_SOURCES)[number];
+
+export const CAPTURE_MODES = ['DEMO', 'PUBLIC', 'AUTHENTICATED'] as const;
+export type CaptureMode = (typeof CAPTURE_MODES)[number];
+
+export const CAPTURE_STATUS = ['NOT_IMPLEMENTED', 'NOT_CONFIGURED', 'CONFIGURED', 'TESTING', 'CONNECTED', 'FAILED', 'DISABLED'] as const;
+export type CaptureStatus = (typeof CAPTURE_STATUS)[number];

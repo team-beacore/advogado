@@ -1,8 +1,16 @@
 import { Router } from 'express';
 import { runCaptureSchema } from '@advogado/shared';
-import { PERMISSIONS } from '@advogado/shared';
+import { PERMISSIONS, CAPTURE_SOURCES } from '@advogado/shared';
 import { requireAuth, requireOrg, getOrgId, requirePermission } from '../auth/middleware';
-import { runCapture, getCaptureStatus, saveCaptureConfig, deleteCaptureConfig, listCaptureConfigs } from '../capture/service';
+import {
+  runCapture,
+  getCaptureStatus,
+  saveSourceConfig,
+  deleteSourceConfig,
+  listSourceConfigs,
+  testSourceConnection,
+  listCaptureRuns,
+} from '../capture/service';
 
 const router = Router();
 
@@ -18,15 +26,28 @@ router.get('/status', async (req, res, next) => {
 router.get('/config', requirePermission(PERMISSIONS.CAPTURE_MANAGE), async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
-    res.json(await listCaptureConfigs(orgId));
+    res.json(await listSourceConfigs(orgId));
   } catch (err) { next(err); }
 });
 
-router.post('/run', async (req, res, next) => {
+router.get('/runs', async (req, res, next) => {
+  try {
+    const orgId = getOrgId(req);
+    const result = await listCaptureRuns(orgId, {
+      page: req.query.page ? Number(req.query.page) : 1,
+      pageSize: req.query.pageSize ? Number(req.query.pageSize) : 20,
+    });
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
+router.post('/run', requirePermission(PERMISSIONS.PUBLICATIONS_CREATE), async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
     const data = runCaptureSchema.parse(req.body ?? {});
-    const result = await runCapture(orgId, data.adapters, req.user!.id, req.ip);
+    // Por padrão executa a demonstração (única fonte funcional sem credenciais)
+    const source = data.source ?? 'DEMO';
+    const result = await runCapture(orgId, source, req.user!.id, req.ip);
     res.json(result);
   } catch (err: unknown) {
     if (err && typeof err === 'object' && 'issues' in err) {
@@ -37,22 +58,39 @@ router.post('/run', async (req, res, next) => {
   }
 });
 
+router.post('/test', requirePermission(PERMISSIONS.PUBLICATIONS_CREATE), async (req, res, next) => {
+  try {
+    const orgId = getOrgId(req);
+    const { source, config } = req.body ?? {};
+    const src = String(source ?? 'DEMO');
+    if (!CAPTURE_SOURCES.includes(src as (typeof CAPTURE_SOURCES)[number])) {
+      res.status(400).json({ code: 'VALIDATION', message: 'Fonte inválida.' });
+      return;
+    }
+    const result = await testSourceConnection(orgId, src as (typeof CAPTURE_SOURCES)[number], config);
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
 router.put('/config', requirePermission(PERMISSIONS.CAPTURE_MANAGE), async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
-    const { adapter, enabled } = req.body;
-    if (!adapter) { res.status(400).json({ code: 'VALIDATION', message: 'adapter é obrigatório.' }); return; }
+    const { source, enabled } = req.body;
+    if (!source || !CAPTURE_SOURCES.includes(source as (typeof CAPTURE_SOURCES)[number])) {
+      res.status(400).json({ code: 'VALIDATION', message: 'Fonte inválida.' });
+      return;
+    }
     // ADMIN pode apenas ativar/desativar; a configuração técnica é definida pelo SUPER ADMIN
-    const existing = await listCaptureConfigs(orgId).then((list) => list.find((c) => c.adapter === adapter.toUpperCase()));
+    const existing = await listSourceConfigs(orgId).then((list) => list.find((c) => c.source === source.toUpperCase()));
     const config: Record<string, unknown> = { enabled: Boolean(enabled) };
     if (existing) {
       config.login = existing.login;
       config.baseUrl = existing.baseUrl;
-      // preserva a senha existente via placeholder (saveCaptureConfig mantém a atual)
+      // preserva a senha existente via placeholder (saveSourceConfig mantém a atual)
       config.password = existing.passwordSet ? 'placeholder' : undefined;
     }
-    await saveCaptureConfig(orgId, adapter, config);
-    res.json({ ok: true, adapter });
+    await saveSourceConfig(orgId, source, config);
+    res.json({ ok: true, source });
   } catch (err: unknown) {
     if (err && typeof err === 'object' && 'issues' in err) {
       res.status(400).json({ code: 'VALIDATION', message: 'Dados inválidos.', details: (err as { issues: unknown }).issues });
@@ -62,16 +100,16 @@ router.put('/config', requirePermission(PERMISSIONS.CAPTURE_MANAGE), async (req,
   }
 });
 
-router.delete('/config/:adapter', requirePermission(PERMISSIONS.CAPTURE_MANAGE), async (req, res, next) => {
+router.delete('/config/:source', requirePermission(PERMISSIONS.CAPTURE_MANAGE), async (req, res, next) => {
   try {
     const orgId = getOrgId(req);
-    const adapter = req.params.adapter?.toUpperCase();
-    if (!adapter || !['PJE', 'ESAJ', 'PROJUDI'].includes(adapter)) {
-      res.status(400).json({ code: 'VALIDATION', message: 'Adapter inválido. Use: PJE, ESAJ ou PROJUDI.' });
+    const source = req.params.source?.toUpperCase();
+    if (!source || !CAPTURE_SOURCES.includes(source as (typeof CAPTURE_SOURCES)[number])) {
+      res.status(400).json({ code: 'VALIDATION', message: 'Fonte inválida.' });
       return;
     }
-    await deleteCaptureConfig(orgId, adapter);
-    res.json({ ok: true, adapter });
+    await deleteSourceConfig(orgId, source);
+    res.json({ ok: true, source });
   } catch (err) { next(err); }
 });
 

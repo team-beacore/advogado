@@ -13,6 +13,7 @@ import {
   ROLES,
   TASK_PRIORITY,
   TASK_STATUS,
+  CAPTURE_SOURCES,
 } from './constants';
 
 export const emailSchema = z.string().trim().email().max(255);
@@ -206,11 +207,11 @@ export const updateNotificationChannelSchema = z.object({
 
 // --- Captura de publicações ---
 export const runCaptureSchema = z.object({
-  adapters: z.array(z.enum(['PJE', 'ESAJ', 'PROJUDI'])).optional(),
+  source: z.enum(CAPTURE_SOURCES).optional(),
 });
 
 export const captureConfigSchema = z.object({
-  adapter: z.enum(['PJE', 'ESAJ', 'PROJUDI']),
+  source: z.enum(CAPTURE_SOURCES),
   enabled: z.boolean().default(true),
   login: z.string().trim().optional().or(z.literal('')).transform((v) => (v ? v : undefined)),
   password: z.string().optional().or(z.literal('')).transform((v) => (v && v !== 'placeholder' ? v : undefined)),

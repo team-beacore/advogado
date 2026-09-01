@@ -21,7 +21,9 @@ interface UserNotificationPrefs {
 }
 
 interface CaptureConfigRow {
-  adapter: string;
+  source: string;
+  mode: string;
+  implemented: boolean;
   enabled: boolean;
   configured: boolean;
   login: string | null;
@@ -115,10 +117,10 @@ export default function Settings() {
   };
 
   // Captura — apenas ativar/desativar
-  const toggleCapture = async (adapter: string, enabled: boolean) => {
+  const toggleCapture = async (source: string, enabled: boolean) => {
     setError(null);
     try {
-      await apiPut('/api/capture/config', { adapter, enabled });
+      await apiPut('/api/capture/config', { source, enabled });
       void load();
     } catch (err) { setError(err); }
   };
@@ -221,29 +223,29 @@ export default function Settings() {
             {/* Capture config — apenas ativar/desativar */}
             <Card title="Captura de publicações" action={<Button className="px-3 py-1.5 text-xs" onClick={load}>Atualizar</Button>}>
               <div className="space-y-4">
-                {captureConfigs.map((c) => (
-                  <div key={c.adapter} className="rounded border border-gray-200 p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm font-semibold text-gray-900">{c.adapter}</div>
-                      <div className="flex items-center gap-2">
-                        {c.configured ? (
-                          <Badge color="green">Configurado</Badge>
-                        ) : (
-                          <Badge color="gray">Não configurado</Badge>
+                {captureConfigs.map((c) => {
+                  const statusIcon = c.implemented ? (c.configured ? '🟢' : '🟡') : '⚪';
+                  const statusLabel = c.implemented ? (c.configured ? 'Configurado' : 'Não configurado') : 'Não implementado';
+                  return (
+                    <div key={c.source} className="rounded border border-gray-200 p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm font-semibold text-gray-900">{c.source} <span className="text-xs font-normal text-gray-500">({c.mode})</span></div>
+                        <div className="flex items-center gap-2">
+                          <Badge color={c.implemented ? (c.configured ? 'green' : 'yellow') : 'gray'}>{statusIcon} {statusLabel}</Badge>
+                        </div>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between">
+                        <span className="text-xs text-gray-500">
+                          {c.implemented ? (c.configured ? (c.enabled ? 'Ativo' : 'Desativado') : 'Configuração feita pelo suporte técnico.') : 'Nenhuma implementação disponível para esta versão.'}
+                        </span>
+                        {c.implemented && c.configured && (
+                          <input type="checkbox" checked={c.enabled} onChange={(e) => void toggleCapture(c.source, e.target.checked)} />
                         )}
                       </div>
                     </div>
-                    <div className="mt-2 flex items-center justify-between">
-                      <span className="text-xs text-gray-500">
-                        {c.configured ? (c.enabled ? 'Ativo' : 'Desativado') : 'Configuração feita pelo suporte técnico.'}
-                      </span>
-                      {c.configured && (
-                        <input type="checkbox" checked={c.enabled} onChange={(e) => void toggleCapture(c.adapter, e.target.checked)} />
-                      )}
-                    </div>
-                  </div>
-                ))}
-                {captureConfigs.length === 0 && <EmptyState title="Nenhum adapter disponível." />}
+                  );
+                })}
+                {captureConfigs.length === 0 && <EmptyState title="Nenhuma fonte disponível." />}
               </div>
             </Card>
 

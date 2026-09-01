@@ -10,6 +10,7 @@ import { auditLog } from '../audit/audit';
 const hasher = new ScryptHasher();
 
 export const WIZARD_STEPS = [
+  'type',
   'organization',
   'administrator',
   'infrastructure',
@@ -30,7 +31,7 @@ export interface WizardState {
   id: string;
   currentStep: number;
   steps: Record<string, StepState>;
-  clientType: 'solo' | 'escritorio';
+  clientType: 'solo' | 'escritorio' | null;
   data: Record<string, unknown>;
   organizationId: string | null;
   adminUserId: string | null;
@@ -62,7 +63,7 @@ export async function getWizardState(): Promise<WizardState | null> {
     id: row.id,
     currentStep: row.current_step,
     steps: parseSteps(row.steps_status),
-    clientType: row.wizard_data?.clientType ?? 'solo',
+    clientType: row.wizard_data?.clientType ?? null,
     data: row.wizard_data ?? {},
     organizationId: row.organization_id,
     adminUserId: row.admin_user_id,
@@ -70,21 +71,21 @@ export async function getWizardState(): Promise<WizardState | null> {
   };
 }
 
-export async function createWizard(clientType: 'solo' | 'escritorio'): Promise<WizardState> {
+export async function createWizard(clientType?: 'solo' | 'escritorio'): Promise<WizardState> {
   const pool = getPool();
   const res = await pool.query(
     `INSERT INTO installation_wizard (current_step, steps_status, wizard_data)
      VALUES (0, $1, $2) RETURNING *`,
-    [JSON.stringify(DEFAULT_STEPS()), JSON.stringify({ clientType, ready: false })],
+    [JSON.stringify(DEFAULT_STEPS()), JSON.stringify({ clientType: clientType ?? null, ready: false })],
   );
   const row = res.rows[0];
-  void auditLog({ organizationId: null, userId: null, action: 'INSTALLATION_STARTED', entity: 'installation', entityId: row.id, after: { clientType }, ip: undefined });
+  void auditLog({ organizationId: null, userId: null, action: 'INSTALLATION_STARTED', entity: 'installation', entityId: row.id, after: { clientType: clientType ?? null }, ip: undefined });
   return {
     id: row.id,
     currentStep: 0,
     steps: DEFAULT_STEPS(),
-    clientType,
-    data: { clientType, ready: false },
+    clientType: clientType ?? null,
+    data: { clientType: clientType ?? null, ready: false },
     organizationId: null,
     adminUserId: null,
     ready: false,
@@ -129,7 +130,22 @@ export function validateOrganizationStep(data: Record<string, unknown>): { ok: b
   return { ok: true };
 }
 
-// --- STEP 1: ORGANIZAÇÃO ---
+// --- STEP 1: TIPO DE CONTRATAÇÃO ---
+export async function stepType(state: WizardState, data: Record<string, unknown>): Promise<WizardState> {
+  const clientType = String(data.clientType ?? data.plan ?? 'solo').toLowerCase();
+  if (clientType !== 'solo' && clientType !== 'escritorio') {
+    await markStep(state, 'type', failState('Tipo de contratação inválido.'));
+    throw errors.validation('Tipo de contratação inválido. Use "SOLO" ou "ESCRITÓRIO".');
+  }
+  state.clientType = clientType as 'solo' | 'escritorio';
+  state.data.clientType = clientType;
+  state.data.planType = clientType === 'escritorio' ? 'OFFICE' : 'SOLO';
+  await markStep(state, 'type', okState(`Plano ${clientType === 'escritorio' ? 'OFFICE' : 'SOLO'} selecionado.`), 1);
+  void auditLog({ organizationId: null, userId: null, action: 'INSTALLATION_TYPE', entity: 'installation', entityId: state.id, after: { clientType }, ip: undefined });
+  return state;
+}
+
+// --- STEP 2: ORGANIZAÇÃO ---
 export async function stepOrganization(state: WizardState, data: Record<string, unknown>): Promise<WizardState> {
   const v = validateOrganizationStep(data);
   if (!v.ok) {
@@ -152,12 +168,12 @@ export async function stepOrganization(state: WizardState, data: Record<string, 
     phone: data.orgPhone ?? null,
     email: data.orgEmail ?? null,
   });
-  await markStep(state, 'organization', okState('Organização criada.'), 1);
+  await markStep(state, 'organization', okState('Organização criada.'), 2);
   void auditLog({ organizationId: org.id, userId: null, action: 'INSTALLATION_ORGANIZATION', entity: 'organization', entityId: org.id, after: { name: data.orgName }, ip: undefined });
   return state;
 }
 
-// --- STEP 2: ADMINISTRADOR INICIAL ---
+// --- STEP 3: ADMINISTRADOR INICIAL ---
 export async function stepAdministrator(state: WizardState, data: Record<string, unknown>): Promise<WizardState> {
   if (!state.organizationId) throw errors.validation('Crie a organização primeiro.');
   const { name, email, password, phone, oab } = data;
@@ -181,12 +197,12 @@ export async function stepAdministrator(state: WizardState, data: Record<string,
   }
   // A senha inicial é temporária; guardada apenas no estado do wizard para o relatório (não no banco em texto puro).
   state.data = { ...state.data, adminName: name, adminEmail: email, adminPhone: phone ?? null, adminOab: oab ?? null, adminInitialPassword: String(password), passwordIsTemporary: true };
-  await markStep(state, 'administrator', okState('Administrador criado e associado.'), 2);
+  await markStep(state, 'administrator', okState('Administrador criado e associado.'), 3);
   void auditLog({ organizationId: state.organizationId, userId: state.adminUserId, action: 'INSTALLATION_ADMIN', entity: 'user', entityId: state.adminUserId, after: { email }, ip: undefined });
   return state;
 }
 
-// --- STEP 3: INFRAESTRUTURA ---
+// --- STEP 4: INFRAESTRUTURA ---
 export async function stepInfrastructure(state: WizardState): Promise<WizardState> {
   const env = getEnv();
   const checks: Array<{ name: string; ok: boolean; detail?: string }> = [];
@@ -219,7 +235,7 @@ export async function stepInfrastructure(state: WizardState): Promise<WizardStat
   const allOk = checks.every((c) => c.ok);
   state.data = { ...state.data, infrastructure: checks, environment: env.NODE_ENV, appUrl: dataUrl(env) };
   if (allOk) {
-    await markStep(state, 'infrastructure', okState('Infraestrutura validada.'), 3);
+    await markStep(state, 'infrastructure', okState('Infraestrutura validada.'), 4);
   } else {
     await markStep(state, 'infrastructure', failState('Falha em algum teste de infraestrutura.'));
   }
@@ -230,7 +246,7 @@ function dataUrl(env: { CORS_ORIGIN: string; NODE_ENV: string; STORAGE_DRIVER: s
   return env.CORS_ORIGIN || 'http://localhost:5173';
 }
 
-// --- STEP 4: EMAIL (SMTP) ---
+// --- STEP 5: EMAIL (SMTP) ---
 export async function stepEmail(state: WizardState, config: Record<string, unknown>): Promise<WizardState> {
   if (!state.organizationId) throw errors.validation('Crie a organização primeiro.');
   // salvar config (segredos na settings, nunca no frontend/relatório)
@@ -238,7 +254,7 @@ export async function stepEmail(state: WizardState, config: Record<string, unkno
   const test = await testEmailConnection(config);
   if (test.ok) {
     state.data = { ...state.data, email: { configured: true, testedAt: new Date().toISOString(), host: config.host } };
-    await markStep(state, 'email', okState('SMTP conectado e email de teste enviado.'), 4);
+    await markStep(state, 'email', okState('SMTP conectado e email de teste enviado.'), 5);
   } else {
     state.data = { ...state.data, email: { configured: true, tested: false, error: test.error } };
     await markStep(state, 'email', failState(test.error ?? 'Falha no teste de SMTP.'));
@@ -274,7 +290,7 @@ export async function testEmailConnection(config: Record<string, unknown>): Prom
   }
 }
 
-// --- STEP 5: IA ---
+// --- STEP 6: IA ---
 export async function stepAI(state: WizardState, config: Record<string, unknown>): Promise<WizardState> {
   const provider = String(config.provider ?? 'openai');
   if (!['openai', 'local'].includes(provider)) {
@@ -341,9 +357,30 @@ export async function stepStorage(state: WizardState): Promise<WizardState> {
 
 // --- STEP 8: CAPTURA ---
 export async function stepCapture(state: WizardState): Promise<WizardState> {
-  const adapters = ['PJE', 'ESAJ', 'PROJUDI'].map((a) => ({ adapter: a, status: 'NOT_CONFIGURED', note: 'Não validado em ambiente real.' }));
-  state.data = { ...state.data, capture: { adapters, testedAt: new Date().toISOString() } };
-  await markStep(state, 'capture', okState('Adapters verificados (sem validação em ambiente real).'), 8);
+  if (!state.organizationId) throw errors.validation('Crie a organização primeiro.');
+  // Validação real da única fonte funcional sem credenciais: DEMO.
+  try {
+    const { runCapture } = await import('../capture/service');
+    const result = await runCapture(state.organizationId, 'DEMO', null);
+    state.data = {
+      ...state.data,
+      capture: {
+        source: 'DEMO',
+        mode: 'DEMO',
+        validated: result.status === 'SUCCESS',
+        testedAt: new Date().toISOString(),
+        result,
+      },
+    };
+    if (result.status === 'SUCCESS') {
+      await markStep(state, 'capture', okState('Captura de demonstração validada (dados fictícios).'), 8);
+    } else {
+      await markStep(state, 'capture', failState(result.errorMessage ?? 'Falha na captura de demonstração.'));
+    }
+  } catch (e) {
+    state.data = { ...state.data, capture: { source: 'DEMO', mode: 'DEMO', validated: false, testedAt: new Date().toISOString() } };
+    await markStep(state, 'capture', failState((e as Error).message.slice(0, 300)));
+  }
   return state;
 }
 
@@ -412,6 +449,13 @@ export async function stepFunctional(state: WizardState): Promise<WizardState> {
       }
     }
     state.data = { ...state.data, functional: { ai: aiFunctional, testedAt: new Date().toISOString() } };
+    // Remove dados de captura DEMO (nunca apaga dados reais)
+    let captureCleanup: { removedPublications: number; removedEvents: number; removedCases: number } | null = null;
+    try {
+      const { cleanupDemoData } = await import('../capture/service');
+      captureCleanup = await cleanupDemoData(state.organizationId);
+    } catch { captureCleanup = null; }
+    state.data = { ...state.data, functional: { ai: aiFunctional, testedAt: new Date().toISOString(), captureCleanup } };
     if (aiFunctional.ok) {
       await markStep(state, 'functional', okState('Teste funcional concluído (dados temporários removidos).'), 11);
     } else {
@@ -434,7 +478,7 @@ export async function stepFunctional(state: WizardState): Promise<WizardState> {
 
 // --- STEP 12: RESUMO / PRONTO ---
 export async function finalizeInstallation(state: WizardState): Promise<WizardState> {
-  const required = ['organization', 'administrator', 'infrastructure', 'email', 'ai', 'storage'];
+  const required = ['type', 'organization', 'administrator', 'infrastructure', 'email', 'ai', 'storage'];
   const missing = required.filter((s) => state.steps[s]?.status !== 'OK');
   if (missing.length > 0) {
     await markStep(state, 'summary', failState(`Etapas pendentes: ${missing.join(', ')}`));
@@ -450,7 +494,7 @@ export async function finalizeInstallation(state: WizardState): Promise<WizardSt
 export async function resetWizard(): Promise<WizardState> {
   const pool = getPool();
   await pool.query('DELETE FROM installation_wizard');
-  return createWizard('solo');
+  return createWizard();
 }
 
 /** Máscara API key: mantém só os 4 últimos caracteres. */

@@ -137,7 +137,6 @@ Também executados: `typecheck`, `lint` (0 avisos), `build` em API e Web.
 
 | Integração | Estado |
 |---|---|
-| WhatsApp | Não configurado. Domínio `leads` + campo `source` prontos |
 | Captura de publicações (PJe/e-SAJ/Projudi) | Não configurado. Adapters previstos; `legal_publications` aceita `external_reference` |
 | PJe / e-SAJ / Projudi | Não configurado |
 | Cobrança / boletos | Não configurado. Sem boleto fake |
@@ -217,7 +216,7 @@ Para usar a IA: defina `OPENAI_API_KEY` em `apps/api/.env` e reinicie a API.
 
 1. **Extração de texto de documentos** (PDF/DOCX/imagem+OCR) e indexação; passar conteúdo real para o contexto da IA.
 2. **Adapters de captura de publicações** (PJe/e-SAJ/Projudi) para inserir intimações automaticamente; hoje o cadastro é manual (real).
-3. **Notificações por canal** (email/WhatsApp) a partir de intimações e prazos reais.
+3. **Notificações por canal** (E-mail via SMTP) a partir de intimações e prazos reais.
 4. **Módulo financeiro**: contratos, cobranças, parcelas, pagamentos — preparar esquema sem gateway ainda.
 5. **Permissões granulares** por processo (`case_members`) e ações por papel.
 6. **Armazenamento S3** via interface `Storage` (já desacoplada).

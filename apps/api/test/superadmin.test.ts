@@ -2,6 +2,7 @@ import { describe, it, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
 import { createAuthHelper, createSuperAdmin, makeApp, resetDb, uniqueEmail } from './helpers';
+import { getPool } from '../src/db/client';
 
 describe('SUPER ADMIN — identidade técnica separada', () => {
   const app = makeApp();
@@ -182,5 +183,110 @@ describe('SUPER ADMIN — identidade técnica separada', () => {
     // sem organização → organizationId null
     assert.equal(loginRes.body.organizationId, null);
     assert.equal(loginRes.body.user.isSuperAdmin, false);
+  });
+});
+
+describe('WIZARD DE IMPLANTAÇÃO — SOLO vs OFFICE', () => {
+  const app = makeApp();
+  const helper = createAuthHelper(app);
+
+  before(async () => { await resetDb(); });
+  after(async () => { const { closePool } = await import('../src/db/client'); await closePool(); });
+  beforeEach(async () => { await resetDb(); });
+
+  async function runWizard(sa: { cookie: string }, clientType: 'solo' | 'escritorio') {
+    const adminEmail = uniqueEmail('wizard');
+    await request(app).post('/api/superadmin/installation').set('Cookie', sa.cookie).send({}).expect(201);
+    await request(app).post('/api/superadmin/installation/step/type').set('Cookie', sa.cookie).send({ clientType }).expect(200);
+    const orgRes = await request(app)
+      .post('/api/superadmin/installation/step/organization')
+      .set('Cookie', sa.cookie)
+      .send({ orgName: clientType === 'solo' ? 'João Silva Advocacia' : 'Silva & Associados', orgUf: 'SP' })
+      .expect(200);
+    await request(app)
+      .post('/api/superadmin/installation/step/administrator')
+      .set('Cookie', sa.cookie)
+      .send({ name: 'João Silva', email: adminEmail, password: 'test1234' })
+      .expect(200);
+    return { adminEmail, orgId: orgRes.body.installation.organizationId as string };
+  }
+
+  it('SOLO: cria organization internamente, ADMIN + LAWYER, apenas 1 membro, plano SOLO', async () => {
+    const sa = await createSuperAdmin(app);
+    const { adminEmail, orgId } = await runWizard(sa, 'solo');
+
+    const pool = getPool();
+    const orgRes = await pool.query('SELECT plan_type FROM organizations WHERE id = $1', [orgId]);
+    assert.equal(orgRes.rows[0]?.plan_type, 'SOLO');
+
+    const members = await pool.query(
+      'SELECT count(*)::int AS n FROM organization_members WHERE organization_id = $1',
+      [orgId],
+    );
+    assert.equal(members.rows[0].n, 1);
+
+    const member = await pool.query(
+      'SELECT role FROM organization_members WHERE organization_id = $1',
+      [orgId],
+    );
+    assert.equal(member.rows[0].role, 'ADMIN');
+
+    // login do admin criado → role ADMIN e org selecionada
+    const login = await request(app).post('/api/auth/login').send({ email: adminEmail, password: 'test1234' }).expect(200);
+    assert.equal(login.body.user.isSuperAdmin, false);
+    assert.ok(login.body.organizationId);
+    const me = await request(app).get('/api/auth/me').set('Cookie', login.headers['set-cookie']?.[0]?.split(';')[0]!).expect(200);
+    assert.equal(me.body.user.role, 'ADMIN');
+
+    // ADMIN possui permissões de LAWYER (consegue criar processo)
+    const cookie = login.headers['set-cookie']?.[0]?.split(';')[0]!;
+    await request(app).post('/api/processes').set('Cookie', cookie).send({ title: 'Proc Solo' }).expect(201);
+
+    // equipe bloqueada (403) no plano SOLO
+    const invite = await request(app).post('/api/organizations/members').set('Cookie', cookie).send({ email: uniqueEmail(), role: 'LAWYER', name: 'X' });
+    assert.equal(invite.status, 403);
+  });
+
+  it('OFFICE: cria organization, primeiro usuário ADMIN + LAWYER, equipe disponível, plano OFFICE', async () => {
+    const sa = await createSuperAdmin(app);
+    const { adminEmail, orgId } = await runWizard(sa, 'escritorio');
+
+    const pool = getPool();
+    const orgRes = await pool.query('SELECT plan_type FROM organizations WHERE id = $1', [orgId]);
+    assert.equal(orgRes.rows[0]?.plan_type, 'OFFICE');
+
+    const login = await request(app).post('/api/auth/login').send({ email: adminEmail, password: 'test1234' }).expect(200);
+    const cookie = login.headers['set-cookie']?.[0]?.split(';')[0]!;
+    assert.equal(login.body.user.isSuperAdmin, false);
+    assert.ok(login.body.organizationId);
+
+    // ADMIN + LAWYER → pode criar processo
+    await request(app).post('/api/processes').set('Cookie', cookie).send({ title: 'Proc Office' }).expect(201);
+
+    // equipe disponível (pode criar LAWYER)
+    const created = await request(app).post('/api/organizations/members').set('Cookie', cookie).send({ email: uniqueEmail(), role: 'LAWYER', name: 'Maria' }).expect(201);
+    assert.equal(created.body.role, 'LAWYER');
+    assert.ok(created.body.temporaryPassword);
+  });
+
+  it('wizard não duplica organization por instalação', async () => {
+    const sa = await createSuperAdmin(app);
+    const { orgId } = await runWizard(sa, 'solo');
+    const pool = getPool();
+    const res = await pool.query('SELECT count(*)::int AS n FROM organizations WHERE id = $1', [orgId]);
+    assert.equal(res.rows[0].n, 1);
+  });
+
+  it('isolamento por organization_id continua após implantação', async () => {
+    const sa = await createSuperAdmin(app);
+    const { adminEmail: soloEmail } = await runWizard(sa, 'solo');
+    const loginA = await request(app).post('/api/auth/login').send({ email: soloEmail, password: 'test1234' }).expect(200);
+    const cookieA = loginA.headers['set-cookie']?.[0]?.split(';')[0]!;
+    const clientA = await request(app).post('/api/clients').set('Cookie', cookieA).send({ name: 'Cliente A' }).expect(201);
+
+    // outra organização via helper
+    const sessionB = await helper.registerAndLogin();
+    const clientsB = await request(app).get('/api/clients').set('Cookie', sessionB.cookie).expect(200);
+    assert.ok(!clientsB.body.items.some((c: { id: string }) => c.id === clientA.body.id));
   });
 });

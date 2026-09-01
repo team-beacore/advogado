@@ -3,11 +3,13 @@ import { requireAuth, requireSuperAdmin } from '../auth/middleware';
 import { getPool } from '../db/client';
 import { getEnv } from '../config';
 import { getProviderInfo } from '../ai/registry';
+import { getStorage } from '../storage';
 import { auditLog } from '../audit/audit';
 import { ScryptHasher } from '../auth/password';
 import {
   getWizardState,
   createWizard,
+  stepType,
   stepOrganization,
   stepAdministrator,
   stepInfrastructure,
@@ -34,24 +36,39 @@ router.get('/status', requireSuperAdmin, async (req, res, next) => {
   try {
     const pool = getPool();
     const env = getEnv();
-    const [orgsRes, usersRes, clientsRes, casesRes] = await Promise.all([
+    const [orgsRes, usersRes, migrationsRes, dbOk] = await Promise.all([
       pool.query('SELECT count(*)::int AS count FROM organizations'),
       pool.query('SELECT count(*)::int AS count FROM users'),
-      pool.query('SELECT count(*)::int AS count FROM clients'),
-      pool.query('SELECT count(*)::int AS count FROM cases'),
+      pool.query('SELECT count(*)::int AS n FROM _migrations'),
+      pool.query('SELECT 1').then(() => true).catch(() => false),
     ]);
     const ai = getProviderInfo();
+    let storageOk = false;
+    try {
+      const storage = getStorage();
+      const key = `.health-${Date.now()}`;
+      await storage.save(Buffer.from('ok'), key);
+      const buf = await storage.read(key);
+      await storage.delete(key);
+      storageOk = buf.toString() === 'ok';
+    } catch { storageOk = false; }
     res.json({
-      ok: true,
+      ok: dbOk,
       version: '1.0.0',
       environment: env.NODE_ENV,
-      storage: env.STORAGE_DRIVER,
+      database: dbOk,
+      storage: { driver: env.STORAGE_DRIVER, ok: storageOk },
+      migrations: migrationsRes.rows[0]?.n ?? 0,
       ai: { provider: ai.name, configured: ai.configured },
+      services: {
+        api: true,
+        database: dbOk,
+        storage: storageOk,
+        migrations: (migrationsRes.rows[0]?.n ?? 0) >= 1,
+      },
       counts: {
         organizations: orgsRes.rows[0]?.count ?? 0,
         users: usersRes.rows[0]?.count ?? 0,
-        clients: clientsRes.rows[0]?.count ?? 0,
-        cases: casesRes.rows[0]?.count ?? 0,
       },
     });
   } catch (err) { next(err); }
@@ -128,23 +145,33 @@ router.get('/installation', requireSuperAdmin, async (_req, res, next) => {
 
 router.post('/installation', requireSuperAdmin, async (req, res, next) => {
   try {
-    const clientType = req.body.clientType === 'escritorio' ? 'escritorio' : 'solo';
+    const clientType = req.body.clientType === 'escritorio' ? 'escritorio' : req.body.clientType === 'solo' ? 'solo' : undefined;
     const state = await createWizard(clientType);
-    res.status(201).json({ installation: state });
+    res.status(201).json({ installation: { ...state, data: sanitizeWizardData(state.data) } });
   } catch (err) { next(err); }
 });
 
 router.post('/installation/reset', requireSuperAdmin, async (_req, res, next) => {
   try {
     const state = await resetWizard();
-    res.json({ installation: state });
+    res.json({ installation: { ...state, data: sanitizeWizardData(state.data) } });
   } catch (err) { next(err); }
+});
+
+router.post('/installation/step/type', requireSuperAdmin, async (req, res, _next) => {
+  try {
+    const state = await getWizardState();
+    if (!state) throw err400('Nenhuma implantação em andamento.');
+    const updated = await stepType(state, req.body);
+    res.json({ installation: { ...updated, data: sanitizeWizardData(updated.data) } });
+  } catch (err) { handleStepError(res, err); }
 });
 
 router.post('/installation/step/organization', requireSuperAdmin, async (req, res, _next) => {
   try {
     const state = await getWizardState();
     if (!state) throw err400('Nenhuma implantação em andamento.');
+    if (!state.clientType) throw err400('Selecione o tipo de contratação primeiro.');
     const updated = await stepOrganization(state, req.body);
     res.json({ installation: { ...updated, data: sanitizeWizardData(updated.data) } });
   } catch (err) { handleStepError(res, err); }
@@ -268,6 +295,33 @@ router.get('/installation/report', requireSuperAdmin, async (_req, res, next) =>
   } catch (err) { next(err); }
 });
 
+// Lista as instalações existentes (uma por VPS; preparado para múltiplas no futuro)
+router.get('/installations', requireSuperAdmin, async (_req, res, next) => {
+  try {
+    const pool = getPool();
+    const res2 = await pool.query(
+      `SELECT o.id, o.name, o.plan_type, o.created_at,
+              w.wizard_data, w.updated_at AS last_validation_at
+       FROM organizations o
+       LEFT JOIN installation_wizard w ON w.organization_id = o.id
+       ORDER BY o.created_at DESC`,
+    );
+    const items = res2.rows.map((row) => {
+      const wizardData = (row.wizard_data ?? {}) as Record<string, unknown>;
+      return {
+        id: row.id,
+        name: row.name,
+        plan: row.plan_type === 'OFFICE' ? 'OFFICE' : 'SOLO',
+        createdAt: row.created_at,
+        lastValidationAt: row.last_validation_at ?? null,
+        ready: wizardData.ready === true,
+        stepSummary: sanitizeWizardData(wizardData),
+      };
+    });
+    res.json({ installations: items });
+  } catch (err) { next(err); }
+});
+
 /** Remove segredos antes de devolver o estado ao frontend. */
 function sanitizeWizardData(data: Record<string, unknown>): Record<string, unknown> {
   const copy: Record<string, unknown> = { ...data };
@@ -333,7 +387,8 @@ async function buildInstallationReport(state: NonNullable<Awaited<ReturnType<typ
   line('CNPJ/CPF', String(d.orgCnpj ?? ''));
   line('OAB', String(d.orgOab ?? ''));
   line('UF', String(d.orgUf ?? ''));
-  line('Tipo', state.clientType === 'escritorio' ? 'Escritório' : 'Advogado Solo');
+  line('Tipo', state.clientType === 'escritorio' ? 'Escritório' : state.clientType === 'solo' ? 'Advogado Solo' : '—');
+  line('Plano', state.clientType === 'escritorio' ? 'OFFICE' : state.clientType === 'solo' ? 'SOLO' : '—');
   y -= 6;
 
   heading('ADMINISTRADOR');
@@ -370,7 +425,7 @@ async function buildInstallationReport(state: NonNullable<Awaited<ReturnType<typ
   page = doc.addPage();
   y = 760;
   heading('CHECKLIST DE SEGURANÇA E TESTES');
-  for (const s of ['organization', 'administrator', 'infrastructure', 'email', 'ai', 'storage', 'capture', 'notifications', 'security', 'functional', 'summary']) {
+  for (const s of ['type', 'organization', 'administrator', 'infrastructure', 'email', 'ai', 'storage', 'capture', 'notifications', 'security', 'functional', 'summary']) {
     line(s, `${ok(steps[s]?.status)} — ${fmt(steps[s]?.testedAt ?? '')}`);
   }
   page.drawText('— Fim do relatório —', { x: 50, y: y - 20, size: 10, font, color: rgb(0.6, 0.6, 0.6) });

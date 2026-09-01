@@ -37,7 +37,7 @@
 │   │   │   ├── events/         # Timeline (case_events)
 │   │   │   ├── extract/        # Extração de texto: PDF (pdfjs-dist), DOCX (mammoth), TXT, OCR (tesseract.js)
 │   │   │   ├── finance/        # Contratos, invoices, installments, payments, gateways (Mercado Pago/Stripe)
-│   │   │   ├── notify/         # Canais de notificação: EmailChannel (nodemailer), WhatsAppChannel (HTTP)
+│   │   │   ├── notify/         # Canais de notificação: EmailChannel (nodemailer/SMTP)
 │   │   │   ├── routes/         # Rotas Express por domínio
 │   │   │   ├── services/       # Lógica de negócio por domínio
 │   │   │   ├── storage/        # Interface Storage, LocalStorage, S3Storage, factory
@@ -230,7 +230,6 @@ Regras:
 
 ### 3. Notificações por canal
 - `EmailChannel` (nodemailer, SMTP real)
-- `WhatsAppChannel` (HTTP API genérica)
 - `notification_deliveries` com status SENT/FAILED/NOT_CONFIGURED
 - Disparo automático ao registrar intimação
 - Configuração via UI (ADMIN) ou `PUT /api/notifications/channels`
@@ -334,8 +333,7 @@ CORS_ORIGIN=http://localhost:5173
 |---|---|---|
 | IA OpenAI-compatível | ✅ Funciona | — |
 | IA Local | ✅ Sempre disponível | — |
-| Email (SMTP) | Arquitetura pronta | Configurar SMTP via settings |
-| WhatsApp | Arquitetura pronta | Configurar API token via settings |
+| Email (SMTP) | ✅ Funciona | Configurar SMTP via settings |
 | Pagamentos (Mercado Pago) | Arquitetura pronta | Inserir accessToken via settings |
 | Pagamentos (Stripe) | Arquitetura pronta | Inserir secretKey via settings |
 | Captura PJe | Arquitetura + config prontas | Adaptar fluxo de login específico do tribunal |

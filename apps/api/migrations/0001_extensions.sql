@@ -15,13 +15,13 @@ ALTER TABLE case_members ADD COLUMN IF NOT EXISTS can_edit BOOLEAN NOT NULL DEFA
 ALTER TABLE case_members ADD COLUMN IF NOT EXISTS can_manage BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE case_members ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
 
--- 3) Canais de notificação e entregas reais (email/WhatsApp)
+-- 3) Canais de notificação e entregas reais (e-mail)
 CREATE TABLE IF NOT EXISTS notification_deliveries (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
   notification_id UUID REFERENCES notifications(id) ON DELETE CASCADE,
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  channel TEXT NOT NULL,           -- 'EMAIL' | 'WHATSAPP'
+  channel TEXT NOT NULL,           -- 'EMAIL'
   recipient TEXT,
   subject TEXT,
   body TEXT,

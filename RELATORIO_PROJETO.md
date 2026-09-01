@@ -9,7 +9,7 @@
 
 Sistema de gestão jurídica (backoffice para advocacia) com backend Express/TypeScript, frontend React/Vite e banco PostgreSQL. Suporta dois modelos de uso no mesmo código: **advogado solo** e **escritório com equipe**. Cada instalação representa uma organização isolada (single-tenant por VPS), com isolamento total por `organization_id`.
 
-Módulos entregues: processos, clientes, intimações (publicações), documentos, tarefas/prazos, leads, financeiro, IA contextual, notificações (e-mail + WhatsApp), portal do cliente, auditoria, captura de publicações, extração de texto/OCR.
+Módulos entregues: processos, clientes, intimações (publicações), documentos, tarefas/prazos, leads, financeiro, IA contextual, notificações (e-mail via SMTP), portal do cliente, auditoria, captura de publicações, extração de texto/OCR.
 
 ---
 
@@ -28,7 +28,7 @@ advogado/
 │   │   │   ├── events/          # Timeline (case_events)
 │   │   │   ├── extract/         # PDF (pdfjs), DOCX (mammoth), TXT, OCR (tesseract)
 │   │   │   ├── finance/         # Contratos, invoices, parcelas, pagamentos, gateways
-│   │   │   ├── notify/          # EmailChannel, WhatsAppChannel (WAHA), registry, service
+│   │   │   ├── notify/          # EmailChannel (SMTP), registry, service
 │   │   │   ├── routes/          # 17 arquivos de rotas
 │   │   │   ├── services/        # 13 services de domínio
 │   │   │   ├── storage/         # LocalStorage / S3Storage
@@ -113,11 +113,11 @@ Mapa `ROLE_PERMISSIONS` em `packages/shared/src/constants.ts`.
 
 ## 7. Fluxo de Notificações
 
-- **Canais:** EmailChannel (nodemailer/SMTP) e WhatsAppChannel (WAHA — `POST {baseUrl}/api/sendText` com `session`, `chatId`, `text`, `X-Api-Key`)
+- **Canais:** EmailChannel (nodemailer/SMTP)
 - **Fluxo:** intimação → processo → **responsável** (`responsible_id`) → preferências → canais habilitados → `notification_deliveries` (SENT/FAILED/NOT_CONFIGURED)
 - **Regra central:** quem registra a intimação NÃO é o destinatário; o responsável pelo processo é.
 - **Cliente:** comunicação genérica/controlada (nunca íntegra da intimação), condicionada a `client_notification_preferences`.
-- **Config:** SMTP via env vars ou settings por organização; WAHA via settings.
+- **Config:** SMTP via env vars ou settings por organização.
 
 ---
 
@@ -177,7 +177,7 @@ Menu lateral filtra itens por permissão do usuário.
 | Banco de dados | **Zerado** (limpo para novo uso) |
 
 ### 12.1 Integrações configuráveis
-OpenAI / IA local · SMTP (e-mail) · WhatsApp (WAHA) · Captura PJe/e-SAJ/Projudi · Mercado Pago/Stripe · Storage S3 · OCR (Tesseract)
+OpenAI / IA local · SMTP (e-mail) · Captura PJe/e-SAJ/Projudi · Mercado Pago/Stripe · Storage S3 · OCR (Tesseract)
 
 ---
 
