@@ -91,6 +91,16 @@ async function findProcessByNumber(organizationId: string, processNumber: string
   return { id: caseId, created: true };
 }
 
+/** Lista números de processo da organização (para consulta DataJud). */
+async function listOrgProcessNumbers(organizationId: string): Promise<string[]> {
+  const pool = getPool();
+  const res = await pool.query(
+    'SELECT process_number FROM cases WHERE organization_id = $1 AND process_number IS NOT NULL AND process_number <> \'\' ORDER BY created_at ASC',
+    [organizationId],
+  );
+  return res.rows.map((r) => String(r.process_number));
+}
+
 async function findProcessByNumberWithTitle(organizationId: string, np: { processNumber: string; title?: string | null }, userId?: string | null): Promise<{ id: string; created: boolean }> {
   const pool = getPool();
   const existing = await pool.query('SELECT id FROM cases WHERE organization_id = $1 AND process_number = $2', [organizationId, np.processNumber]);
@@ -128,7 +138,9 @@ async function existsPublication(organizationId: string, processId: string, exte
   return res.rows.length > 0;
 }
 
-/** Verifica se uma movimentação já existe (idempotência). */
+/** Verifica se uma movimentação já existe (idempotência).
+ *  Quando sourceReference está presente, usa apenas ele como identidade única.
+ *  O fallback por descrição só é usado quando não há referência externa. */
 async function existsMovement(organizationId: string, processId: string, source: string, sourceReference: string | null | undefined, description: string): Promise<boolean> {
   const pool = getPool();
   if (sourceReference) {
@@ -136,7 +148,7 @@ async function existsMovement(organizationId: string, processId: string, source:
       `SELECT id FROM case_events WHERE process_id = $1 AND source = $2 AND source_reference = $3`,
       [processId, source, sourceReference],
     );
-    if (res.rows.length > 0) return true;
+    return res.rows.length > 0;
   }
   const res = await pool.query(
     `SELECT id FROM case_events WHERE process_id = $1 AND title = $2 AND description = $3 AND source = $4`,
@@ -162,7 +174,7 @@ function inferErrorCode(err: unknown, source: string, config: Record<string, unk
   return CAPTURE_ERROR_CODES.SOURCE_UNAVAILABLE;
 }
 
-function captureError(errorCode: CaptureErrorCode, detail?: string): string {
+function _captureError(errorCode: CaptureErrorCode, detail?: string): string {
   const base = CAPTURE_ERROR_MESSAGES[errorCode];
   return detail ? `${base} ${detail}` : base;
 }
@@ -192,6 +204,15 @@ export async function runCapture(
 
   const config = await getSourceConfig(organizationId, source);
 
+  // DataJud consulta por número de processo: reúne os números dos processos da
+  // organização (dedup por CNJ acontece no engine). Sem números, não há chamada
+  // real possível e a captura retorna vazio honesto.
+  let effectiveConfig = config;
+  if (source === 'DATAJUD') {
+    const numbers = await listOrgProcessNumbers(organizationId);
+    effectiveConfig = { ...(config ?? {}), processNumbers: numbers };
+  }
+
   // 1) Disponibilidade da fonte
   if (!adapter.implemented) {
     steps.push({ name: 'Disponibilidade', status: 'FAILED', message: `Fonte ${adapter.label} ainda não implementada.` });
@@ -218,7 +239,7 @@ export async function runCapture(
   try {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        result = await adapter.fetch(config!);
+        result = await adapter.fetch(effectiveConfig!);
         break;
       } catch (e) {
         if (attempt >= maxRetries) throw e;

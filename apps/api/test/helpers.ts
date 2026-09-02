@@ -75,6 +75,7 @@ export async function resetDb(): Promise<void> {
     `TRUNCATE TABLE installation_wizard, audit_logs, ai_approvals, ai_interactions, case_events, case_members, documents,
      legal_publications, tasks, notification_deliveries, notifications, notification_preferences,
      client_notification_preferences, leads, clients, cases, organization_members, organizations,
+     process_discovery_results, professional_identities, capture_runs,
      sessions, users RESTART IDENTITY CASCADE`,
   );
 }

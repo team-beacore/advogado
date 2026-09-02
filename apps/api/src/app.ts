@@ -16,6 +16,8 @@ import financeRoutes from './routes/finance';
 import captureRoutes from './routes/capture';
 import portalRoutes from './routes/portal';
 import superAdminRoutes from './routes/superadmin';
+import processDiscoveryRoutes from './routes/processDiscovery';
+import professionalIdentityRoutes from './routes/professionalIdentity';
 import { requireAuth } from './auth/middleware';
 import { getEnv } from './config';
 import { getPool } from './db/client';
@@ -79,6 +81,8 @@ export function createApp() {
   app.use('/api/capture', captureRoutes);
   app.use('/api/portal', portalRoutes);
   app.use('/api/superadmin', superAdminRoutes);
+  app.use('/api/process-discovery', processDiscoveryRoutes);
+  app.use('/api/professional-identity', professionalIdentityRoutes);
 
   // Error handler
   app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {

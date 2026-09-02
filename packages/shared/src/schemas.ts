@@ -2,6 +2,8 @@ import { z } from 'zod';
 import {
   CASE_STATUS,
   CONTRACT_STATUS,
+  DISCOVERY_CONFIDENCE,
+  DISCOVERY_STATUS,
   INVOICE_STATUS,
   INTERNAL_ROLES,
   LEAD_STATUS,
@@ -10,7 +12,6 @@ import {
   PAYMENT_METHODS,
   PAYMENT_STATUS,
   PUBLICATION_STATUS,
-  ROLES,
   TASK_PRIORITY,
   TASK_STATUS,
   CAPTURE_SOURCES,
@@ -246,4 +247,50 @@ export const clientPortalLoginSchema = z.object({
 export const clientCaseShareSchema = z.object({
   caseId: z.string().uuid(),
   canViewDocuments: z.boolean().default(false),
+});
+
+// --- Identidade profissional (descoberta de processos) ---
+export const professionalIdentitySchema = z.object({
+  professionalName: z.string().trim().min(2).max(255),
+  oabNumber: z.string().trim().min(1).max(40),
+  oabState: z.string().trim().min(2).max(4),
+  identifiers: z.record(z.unknown()).optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+// --- Descoberta de processos ---
+export const runDiscoverySchema = z.object({
+  source: z.enum(CAPTURE_SOURCES).optional(),
+});
+
+export const discoveryResultStatusSchema = z.enum(DISCOVERY_STATUS);
+
+export const discoveryResultActionSchema = z.object({
+  status: z.enum(['APPROVED', 'REJECTED', 'PENDING_REVIEW']).optional(),
+  responsibleId: z.string().uuid().nullable().optional(),
+});
+
+export const discoveryImportSchema = z.object({
+  responsibleId: z.string().uuid().nullable().optional(),
+  clientId: z.string().uuid().nullable().optional(),
+  newClient: createClientSchema.optional(),
+});
+
+export const discoveryImportBatchSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(200),
+  responsibleId: z.string().uuid().nullable().optional(),
+  clientId: z.string().uuid().nullable().optional(),
+  newClient: createClientSchema.optional(),
+});
+
+export const listDiscoveryResultsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  status: z.enum(DISCOVERY_STATUS).optional(),
+  source: z.string().trim().max(60).optional(),
+  confidence: z.enum(DISCOVERY_CONFIDENCE).optional(),
+  processNumber: z.string().trim().max(120).optional(),
+  court: z.string().trim().max(255).optional(),
+  discoveredFrom: z.string().datetime({ offset: true }).optional(),
+  discoveredTo: z.string().datetime({ offset: true }).optional(),
 });

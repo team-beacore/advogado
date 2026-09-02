@@ -31,7 +31,7 @@ export const DEMO_PROCESSES: Array<ExternalProcess & { id: string }> = [
   },
 ];
 
-const DEMO_MOVEMENTS: ExternalMovement[] = [
+export const DEMO_MOVEMENTS: ExternalMovement[] = [
   { processNumber: '0000000-00.2026.8.00.0001', date: '2026-01-10', description: 'Distribuição', sourceReference: 'demo-mov-001' },
   { processNumber: '0000000-00.2026.8.00.0001', date: '2026-01-12', description: 'Juntada de documento', sourceReference: 'demo-mov-002' },
   { processNumber: '0000000-00.2026.8.00.0001', date: '2026-01-15', description: 'Despacho', sourceReference: 'demo-mov-003' },
@@ -52,7 +52,7 @@ const DEMO_MOVEMENTS: ExternalMovement[] = [
   { processNumber: '0000002-22.2026.8.00.0003', date: '2026-02-14', description: 'Sentença homologatória', sourceReference: 'demo-mov-206' },
 ];
 
-const DEMO_PUBLICATIONS: ExternalPublication[] = [
+export const DEMO_PUBLICATIONS: ExternalPublication[] = [
   {
     processNumber: '0000000-00.2026.8.00.0001',
     content: 'Publicação de demonstração: ficará o autor intimado para manifestar-se no prazo legal.',

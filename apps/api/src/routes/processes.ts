@@ -5,6 +5,8 @@ import { PERMISSIONS } from '@advogado/shared';
 import * as caseService from '../services/caseService';
 import { addEvent, listEvents } from '../events/timeline';
 import { auditLog } from '../audit/audit';
+import { syncCase, listCaseSyncRuns } from '../capture/sync/service';
+import { getPool } from '../db/client';
 
 const router = Router();
 
@@ -83,6 +85,50 @@ router.get('/:id/events', async (req, res, next) => {
     await assertPermission(req, req.params.id!, 'view');
     const events = await listEvents(req.params.id!);
     res.json(events);
+  } catch (err) { next(err); }
+});
+
+// Histórico de sincronizações do processo (capture_runs).
+router.get('/:id/sync-runs', async (req, res, next) => {
+  try {
+    await assertPermission(req, req.params.id!, 'view');
+    const orgId = getOrgId(req);
+    const result = await listCaseSyncRuns(orgId, req.params.id!, {
+      page: req.query.page ? Number(req.query.page) : 1,
+      pageSize: req.query.pageSize ? Number(req.query.pageSize) : 20,
+    });
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
+// Sincronização manual do processo com sua fonte de dados (DataJud).
+router.post('/:id/sync', async (req, res, next) => {
+  try {
+    await assertPermission(req, req.params.id!, 'edit');
+    const orgId = getOrgId(req);
+    const result = await syncCase(orgId, req.params.id!, req.user!.id, req.ip);
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
+// Ativar/pausar monitoramento automático do processo.
+router.patch('/:id/monitoring', async (req, res, next) => {
+  try {
+    await assertPermission(req, req.params.id!, 'edit');
+    const orgId = getOrgId(req);
+    const { enabled } = req.body ?? {};
+    if (typeof enabled !== 'boolean') {
+      res.status(400).json({ code: 'VALIDATION', message: 'Informe enabled: true ou false.' });
+      return;
+    }
+    const newStatus = enabled ? 'ACTIVE' : 'PAUSED';
+    const pool = getPool();
+    await pool.query(
+      'UPDATE cases SET monitoring_status = $1, updated_at = now() WHERE id = $2 AND organization_id = $3',
+      [newStatus, req.params.id!, orgId],
+    );
+    void auditLog({ organizationId: orgId, userId: req.user!.id, action: enabled ? 'PROCESS_MONITORING_ENABLED' : 'PROCESS_MONITORING_PAUSED', entity: 'case', entityId: req.params.id, after: { monitoringStatus: newStatus }, ip: req.ip });
+    res.json({ id: req.params.id, monitoring_status: newStatus });
   } catch (err) { next(err); }
 });
 

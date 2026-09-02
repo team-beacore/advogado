@@ -3,6 +3,7 @@ import { loadEnv } from './config';
 import { getPool, connectionOk, closePool } from './db/client';
 import { runMigrations } from './db/migrate';
 import { ensureDatabaseStarted } from './db/startEmbedded';
+import { getMonitorScheduler, stopMonitorScheduler } from './capture/scheduler/service';
 
 async function main() {
   const env = loadEnv();
@@ -59,8 +60,19 @@ async function main() {
     console.log(`API rodando em http://localhost:${env.PORT}`);
   });
 
+  // Monitor automático de processos (orquestra syncCase). Desabilitado por
+  // padrão; habilite com PROCESS_MONITOR_ENABLED=true em produção.
+  if (env.PROCESS_MONITOR_ENABLED === 'true') {
+    try {
+      getMonitorScheduler().start();
+    } catch (e) {
+      console.log('Aviso: falha ao iniciar scheduler de monitoramento:', (e as Error).message);
+    }
+  }
+
   const shutdown = async () => {
     console.log('\nDesligando...');
+    stopMonitorScheduler();
     server.close();
     await closePool();
     process.exit(0);

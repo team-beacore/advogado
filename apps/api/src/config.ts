@@ -33,6 +33,12 @@ const envSchema = z.object({
   SUPER_ADMIN_EMAIL: z.string().default(''),
   SUPER_ADMIN_PASSWORD: z.string().default(''),
   SUPER_ADMIN_NAME: z.string().default('Plataforma'),
+  DATAJUD_API_KEY: z.string().default(''),
+  DATAJUD_BASE_URL: z.string().default('https://api-publica.datajud.cnj.jus.br'),
+  DATAJUD_TIMEOUT_MS: z.coerce.number().int().positive().default(35000),
+  PROCESS_MONITOR_ENABLED: z.string().default('false'),
+  PROCESS_MONITOR_INTERVAL_MINUTES: z.coerce.number().int().positive().default(60),
+  PROCESS_MONITOR_CONCURRENCY: z.coerce.number().int().positive().default(2),
 });
 
 export type Env = z.infer<typeof envSchema>;

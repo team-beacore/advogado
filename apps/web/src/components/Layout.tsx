@@ -35,6 +35,7 @@ const icons: Record<string, string> = {
 const nav: Array<{ to: string; label: string; icon: string; group: string; end?: boolean; perm?: string; plan?: 'SOLO' | 'OFFICE' }> = [
   { to: '/', label: 'Visão Geral', end: true, icon: 'overview', group: 'Painel' },
   { to: '/processos', label: 'Processos', icon: 'processes', group: 'Operação', perm: 'processes.read' },
+  { to: '/descoberta', label: 'Descoberta', icon: 'processes', group: 'Operação', perm: 'process_discovery.view' },
   { to: '/clientes', label: 'Clientes', icon: 'clients', group: 'Operação', perm: 'clients.read' },
   { to: '/tarefas', label: 'Tarefas', icon: 'tasks', group: 'Operação', perm: 'tasks.read' },
   { to: '/intimacoes', label: 'Intimações', icon: 'publications', group: 'Operação', perm: 'publications.read' },

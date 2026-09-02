@@ -20,6 +20,9 @@ interface ProcessDetail {
   client_id: string | null;
   responsible_name: string | null;
   responsible_id: string | null;
+  last_synced_at: string | null;
+  monitoring_status: string | null;
+  last_sync_error: string | null;
   events: Array<Record<string, unknown>>;
   documents: Array<Record<string, unknown>>;
   publications: Array<Record<string, unknown>>;
@@ -35,7 +38,7 @@ interface AiInteraction {
   approvals: Array<{ id: string; status: string; reviewed_at: string | null; edited_output: Record<string, unknown> | null }> | null;
 }
 
-type Tab = 'visao' | 'timeline' | 'documentos' | 'intimacoes' | 'tarefas' | 'ia' | 'auditoria';
+type Tab = 'visao' | 'timeline' | 'documentos' | 'intimacoes' | 'tarefas' | 'ia' | 'auditoria' | 'sincronizacao';
 
 export default function ProcessDetail() {
   const { id } = useParams();
@@ -72,6 +75,7 @@ export default function ProcessDetail() {
     { key: 'tarefas', label: `Tarefas (${data?.tasks.length ?? 0})` },
     { key: 'ia', label: 'IA' },
     { key: 'auditoria', label: 'Auditoria' },
+    { key: 'sincronizacao', label: 'Sincronização' },
   ];
 
   if (loading) return <div className="flex items-center gap-2.5 text-sm text-gray-500"><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-200 border-t-brand-600" />Carregando…</div>;
@@ -107,18 +111,32 @@ export default function ProcessDetail() {
         ))}
       </div>
 
-      {tab === 'visao' && <Overview data={data} />}
+      {tab === 'visao' && <Overview data={data} onRefresh={refresh} />}
       {tab === 'timeline' && <TimelineTab data={data} onRefresh={refresh} />}
       {tab === 'documentos' && <DocumentsTab data={data} onRefresh={refresh} />}
       {tab === 'intimacoes' && <PublicationsTab data={data} onRefresh={refresh} />}
       {tab === 'tarefas' && <TasksTab data={data} onRefresh={refresh} />}
       {tab === 'ia' && <AiTab processId={data.id} onRefresh={refresh} />}
       {tab === 'auditoria' && <AuditTab processId={data.id} />}
+      {tab === 'sincronizacao' && <SyncTab data={data} onRefresh={refresh} />}
     </div>
   );
 }
 
-function Overview({ data }: { data: ProcessDetail }) {
+function Overview({ data, onRefresh }: { data: ProcessDetail; onRefresh: () => Promise<void> }) {
+  const [monitoringBusy, setMonitoringBusy] = useState(false);
+
+  const toggleMonitoring = async (enabled: boolean) => {
+    setMonitoringBusy(true);
+    try {
+      await apiPatch(`/api/processes/${data.id}/monitoring`, { enabled });
+      await onRefresh();
+    } catch {
+      // erro ignorado — o refresh trará os dados corretos
+    } finally {
+      setMonitoringBusy(false);
+    }
+  };
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
       <div className="lg:col-span-2">
@@ -136,7 +154,38 @@ function Overview({ data }: { data: ProcessDetail }) {
           {data.description && <p className="mt-4 text-sm text-gray-700">{data.description}</p>}
         </Card>
       </div>
-      <div>
+      <div className="space-y-6">
+        <Card title="Monitoramento">
+          <dl className="space-y-2.5 text-sm">
+            <div className="flex items-center justify-between">
+              <dt className="text-gray-500">Status</dt>
+              <dd>
+                <Badge color={data.monitoring_status === 'ERROR' ? 'red' : data.monitoring_status === 'ACTIVE' ? 'green' : data.monitoring_status === 'PAUSED' ? 'yellow' : 'gray'}>
+                  {data.monitoring_status === 'ACTIVE' ? '🟢 Ativo' : data.monitoring_status === 'PAUSED' ? '⏸ Pausado' : data.monitoring_status === 'ERROR' ? '🔴 Erro' : '—'}
+                </Badge>
+              </dd>
+            </div>
+            <div className="flex justify-between"><dt className="text-gray-500">Última sincronização</dt><dd className="font-medium text-gray-900">{formatDateTime(data.last_synced_at)}</dd></div>
+            <div className="flex justify-between"><dt className="text-gray-500">Fonte</dt><dd className="font-medium text-gray-900">DataJud</dd></div>
+            {data.last_sync_error && <div className="mt-2 rounded-md bg-danger-50 px-3 py-2 text-xs text-danger-700">Último erro: {data.last_sync_error}</div>}
+            <div className="pt-2">
+              <button
+                onClick={() => toggleMonitoring(false)}
+                disabled={monitoringBusy || data.monitoring_status === 'PAUSED' || data.monitoring_status === 'ERROR'}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-40"
+              >
+                {monitoringBusy ? '…' : '⏸ Pausar monitoramento'}
+              </button>
+              <button
+                onClick={() => toggleMonitoring(true)}
+                disabled={monitoringBusy || data.monitoring_status === 'ACTIVE'}
+                className="mt-1.5 w-full rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-40"
+              >
+                {monitoringBusy ? '…' : '▶ Ativar monitoramento'}
+              </button>
+            </div>
+          </dl>
+        </Card>
         <Card title="Contadores">
           <ul className="space-y-2 text-sm">
             <li className="flex justify-between"><span>Documentos</span><b>{data.documents.length}</b></li>
@@ -709,6 +758,130 @@ function AuditTab({ processId }: { processId: string }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+interface SyncRun {
+  id: string;
+  source: string;
+  status: string;
+  found_count: number;
+  imported_count: number;
+  duplicate_count: number;
+  error_count: number;
+  error_message: string | null;
+  started_at: string;
+  finished_at: string | null;
+  user_name: string | null;
+}
+
+interface SyncResponse {
+  status: string;
+  found: number;
+  inserted: number;
+  duplicates: number;
+  errors: number;
+  synchronizedAt: string;
+  errorMessage?: string | null;
+}
+
+function SyncTab({ data, onRefresh }: { data: ProcessDetail; onRefresh: () => Promise<void> }) {
+  const [runs, setRuns] = useState<SyncRun[]>([]);
+  const [syncing, setSyncing] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const [lastResult, setLastResult] = useState<SyncResponse | null>(null);
+
+  const loadRuns = useCallback(async () => {
+    try {
+      const res = await apiGet<{ items: SyncRun[] }>(`/api/processes/${data.id}/sync-runs`);
+      setRuns(res.items);
+    } catch (e) { setError(e); }
+  }, [data.id]);
+
+  useEffect(() => { void loadRuns(); }, [loadRuns]);
+
+  const doSync = async () => {
+    setSyncing(true);
+    setError(null);
+    setLastResult(null);
+    try {
+      const res = await apiPost<SyncResponse>(`/api/processes/${data.id}/sync`);
+      setLastResult(res);
+      await loadRuns();
+      await onRefresh();
+    } catch (e) { setError(e); }
+    finally { setSyncing(false); }
+  };
+
+  return (
+    <div className="max-w-3xl space-y-6">
+      <Card title="Sincronizar processo">
+        <p className="mb-4 text-sm text-gray-600">
+          Consulta este processo na fonte judicial (DataJud) para identificar novas movimentações.
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button onClick={() => void doSync()} disabled={syncing || !data.process_number}>
+            {syncing ? 'Sincronizando…' : 'Sincronizar agora'}
+          </Button>
+          <span className="text-xs text-gray-400">
+            Última sincronização: {formatDateTime(data.last_synced_at)}
+          </span>
+        </div>
+        <ErrorAlert error={error} />
+        {lastResult && (
+          <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm">
+            <div className="mb-2 flex items-center gap-2">
+              <Badge color={lastResult.status === 'SUCCESS' ? 'green' : lastResult.status === 'PARTIAL' ? 'yellow' : 'red'}>
+                {lastResult.status}
+              </Badge>
+              <span className="text-gray-500">Sincronização concluída em {formatDateTime(lastResult.synchronizedAt)}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div><div className="text-[11px] uppercase tracking-wide text-gray-400">Encontrados</div><div className="font-semibold text-gray-900">{lastResult.found}</div></div>
+              <div><div className="text-[11px] uppercase tracking-wide text-gray-400">Novos</div><div className="font-semibold text-green-700">{lastResult.inserted}</div></div>
+              <div><div className="text-[11px] uppercase tracking-wide text-gray-400">Duplicados</div><div className="font-semibold text-gray-900">{lastResult.duplicates}</div></div>
+              <div><div className="text-[11px] uppercase tracking-wide text-gray-400">Erros</div><div className="font-semibold text-danger-700">{lastResult.errors}</div></div>
+            </div>
+            {lastResult.errorMessage && <div className="mt-2 text-xs text-danger-700">{lastResult.errorMessage}</div>}
+          </div>
+        )}
+      </Card>
+
+      <Card title="Histórico de sincronizações">
+        {runs.length === 0 ? (
+          <EmptyState title="Nenhuma sincronização registrada." hint="Use o botão acima para consultar o processo na fonte." />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="table-legal min-w-full">
+              <thead className="bg-gray-50/70">
+                <tr>
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-500">Data</th>
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-500">Fonte</th>
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-500">Encontrados</th>
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-500">Novos</th>
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-500">Duplicados</th>
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-500">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {runs.map((r) => (
+                  <tr key={r.id}>
+                    <td className="px-4 py-2 text-gray-500">{formatDateTime(r.started_at)}</td>
+                    <td className="px-4 py-2 font-medium">{r.source}</td>
+                    <td className="px-4 py-2 text-gray-500">{r.found_count}</td>
+                    <td className="px-4 py-2 font-medium text-green-700">{r.imported_count}</td>
+                    <td className="px-4 py-2 text-gray-500">{r.duplicate_count}</td>
+                    <td className="px-4 py-2">
+                      <Badge color={statusColor(r.status)}>{statusLabel(r.status)}</Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
     </div>
   );
 }

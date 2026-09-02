@@ -21,6 +21,8 @@ import SuperAdminInstall from './pages/SuperAdminInstall';
 import PortalLogin from './pages/PortalLogin';
 import PortalDashboard from './pages/PortalDashboard';
 import PortalProcessDetail from './pages/PortalProcessDetail';
+import ProcessDiscovery from './pages/ProcessDiscovery';
+import ProcessDiscoveryReview from './pages/ProcessDiscoveryReview';
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -70,6 +72,8 @@ export default function App() {
         <Route index element={<RequireOrg><Dashboard /></RequireOrg>} />
         <Route path="processos" element={<RequireOrg><Processes /></RequireOrg>} />
         <Route path="processos/:id" element={<RequireOrg><ProcessDetail /></RequireOrg>} />
+        <Route path="descoberta" element={<RequireOrg><ProcessDiscovery /></RequireOrg>} />
+        <Route path="descoberta/:id" element={<RequireOrg><ProcessDiscoveryReview /></RequireOrg>} />
         <Route path="clientes" element={<RequireOrg><Clients /></RequireOrg>} />
         <Route path="clientes/:id" element={<RequireOrg><ClientDetail /></RequireOrg>} />
         <Route path="tarefas" element={<RequireOrg><Tasks /></RequireOrg>} />

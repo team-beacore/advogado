@@ -10,6 +10,10 @@ export const PERMISSIONS = {
   SETTINGS_MANAGE: 'settings.manage',
   NOTIFICATIONS_MANAGE: 'notifications.manage',
   CAPTURE_MANAGE: 'capture.manage',
+  CAPTURE_VIEW: 'capture.view',
+  PROCESS_DISCOVERY_VIEW: 'process_discovery.view',
+  PROCESS_DISCOVERY_RUN: 'process_discovery.run',
+  PROCESS_DISCOVERY_IMPORT: 'process_discovery.import',
   CLIENTS_READ: 'clients.read',
   CLIENTS_CREATE: 'clients.create',
   CLIENTS_UPDATE: 'clients.update',
@@ -43,6 +47,10 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     PERMISSIONS.SETTINGS_MANAGE,
     PERMISSIONS.NOTIFICATIONS_MANAGE,
     PERMISSIONS.CAPTURE_MANAGE,
+    PERMISSIONS.CAPTURE_VIEW,
+    PERMISSIONS.PROCESS_DISCOVERY_VIEW,
+    PERMISSIONS.PROCESS_DISCOVERY_RUN,
+    PERMISSIONS.PROCESS_DISCOVERY_IMPORT,
     PERMISSIONS.CLIENTS_READ,
     PERMISSIONS.CLIENTS_CREATE,
     PERMISSIONS.CLIENTS_UPDATE,
@@ -67,6 +75,10 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     PERMISSIONS.CLIENT_PORTAL_MANAGE,
   ],
   LAWYER: [
+    PERMISSIONS.CAPTURE_VIEW,
+    PERMISSIONS.PROCESS_DISCOVERY_VIEW,
+    PERMISSIONS.PROCESS_DISCOVERY_RUN,
+    PERMISSIONS.PROCESS_DISCOVERY_IMPORT,
     PERMISSIONS.CLIENTS_READ,
     PERMISSIONS.CLIENTS_CREATE,
     PERMISSIONS.CLIENTS_UPDATE,
@@ -88,6 +100,8 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     PERMISSIONS.AUDIT_READ,
   ],
   ASSISTANT: [
+    PERMISSIONS.CAPTURE_VIEW,
+    PERMISSIONS.PROCESS_DISCOVERY_VIEW,
     PERMISSIONS.CLIENTS_READ,
     PERMISSIONS.CLIENTS_CREATE,
     PERMISSIONS.CLIENTS_UPDATE,
@@ -181,7 +195,7 @@ export const PAYMENT_METHODS = ['PIX', 'CREDIT_CARD', 'BOLETO', 'TRANSFER', 'CAS
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 export const NOTIFICATION_CHANNELS = ['EMAIL'] as const;
 export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
-export const CAPTURE_SOURCES = ['DEMO', 'DATAJUD', 'PJE', 'ESAJ', 'PROJUDI'] as const;
+export const CAPTURE_SOURCES = ['DEMO', 'DATAJUD', 'PJE', 'ESAJ', 'PROJUDI', 'DJEN'] as const;
 export type CaptureSource = (typeof CAPTURE_SOURCES)[number];
 
 export const CAPTURE_MODES = ['DEMO', 'PUBLIC', 'AUTHENTICATED'] as const;
@@ -189,3 +203,10 @@ export type CaptureMode = (typeof CAPTURE_MODES)[number];
 
 export const CAPTURE_STATUS = ['NOT_IMPLEMENTED', 'NOT_CONFIGURED', 'CONFIGURED', 'TESTING', 'CONNECTED', 'FAILED', 'DISABLED'] as const;
 export type CaptureStatus = (typeof CAPTURE_STATUS)[number];
+
+export const DISCOVERY_STATUS = ['DISCOVERED', 'PENDING_REVIEW', 'APPROVED', 'IMPORTED', 'REJECTED', 'DUPLICATE', 'ERROR'] as const;
+export type DiscoveryStatus = (typeof DISCOVERY_STATUS)[number];
+
+/** Confiança de um resultado de descoberta (explicável, nunca inventada). */
+export const DISCOVERY_CONFIDENCE = ['HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'] as const;
+export type DiscoveryConfidence = (typeof DISCOVERY_CONFIDENCE)[number];

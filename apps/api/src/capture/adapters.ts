@@ -1,14 +1,15 @@
 import { errors } from '../errors';
 import type { CaptureAdapter, CaptureFetchResult, CaptureTestResult } from './types';
 import { DemoCaptureAdapter } from './demo';
+import { DataJudCaptureAdapter } from './datajud/adapter';
 
 /**
  * Adapters de tribunais autenticados (PJe, e-SAJ, Projudi) e fonte pública (DataJud).
  *
- * IMPORTANTE: estas fontes ainda NÃO possuem implementação real validada contra os
- * sistemas oficiais. Elas são declaradas na arquitetura (contrato + status honesto),
- * mas `implemented = false` — NUNCA fingem conexão ou retornam dados fictícios como reais.
- * Uma integração de produção exige credenciais reais e validação contra o tribunal.
+ * DataJud: integração real implementada (consulta por número CNJ), chamadas HTTP reais.
+ * PJe/e-SAJ/PROJUDI: ainda NÃO possuem implementação real validada contra os sistemas
+ * oficiais. São declaradas na arquitetura (contrato + status honesto), mas
+ * `implemented = false` — NUNCA fingem conexão ou retornam dados fictícios como reais.
  */
 
 function externalUnavailable(message: string): never {
@@ -20,8 +21,8 @@ class NotImplementedAdapter implements CaptureAdapter {
   readonly implemented = false;
 
   constructor(
-    readonly source: 'DATAJUD' | 'PJE' | 'ESAJ' | 'PROJUDI',
-    readonly mode: 'PUBLIC' | 'AUTHENTICATED',
+    readonly source: 'PJE' | 'ESAJ' | 'PROJUDI',
+    readonly mode: 'AUTHENTICATED',
     readonly label: string,
   ) {}
 
@@ -44,10 +45,9 @@ class NotImplementedAdapter implements CaptureAdapter {
 
 /**
  * DataJud — fonte pública do CNJ.
- * Arquitetura declarada como fonte pública, porém a implementação real
- * (consulta à API pública do CNJ) ainda não foi validada nesta versão.
+ * Integração real: consulta por número CNJ com chamadas HTTP reais à API Pública.
  */
-const dataJudAdapter = new NotImplementedAdapter('DATAJUD', 'PUBLIC', 'DataJud');
+const dataJudAdapter = new DataJudCaptureAdapter();
 
 const pjeAdapter = new NotImplementedAdapter('PJE', 'AUTHENTICATED', 'PJe');
 const esajAdapter = new NotImplementedAdapter('ESAJ', 'AUTHENTICATED', 'e-SAJ');
