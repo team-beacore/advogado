@@ -2,6 +2,7 @@ import { errors } from '../errors';
 import { getPool } from '../db/client';
 import { auditLog } from '../audit/audit';
 import { addEvent } from '../events/timeline';
+import { isCaseStale } from '../capture/scheduler/service';
 
 export interface CaseInput {
   clientId?: string | null;
@@ -272,6 +273,7 @@ export async function getCaseDetail(organizationId: string, caseId: string) {
   ]);
   return {
     ...caseRow,
+    monitoring_stale: isCaseStale(caseRow),
     members: members.rows,
     events: events.rows,
     documents: documents.rows,

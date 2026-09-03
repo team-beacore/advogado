@@ -36,9 +36,17 @@ const envSchema = z.object({
   DATAJUD_API_KEY: z.string().default(''),
   DATAJUD_BASE_URL: z.string().default('https://api-publica.datajud.cnj.jus.br'),
   DATAJUD_TIMEOUT_MS: z.coerce.number().int().positive().default(35000),
+  PJE_CLIENT_ID: z.string().default(''),
+  PJE_CLIENT_SECRET: z.string().default(''),
+  PJE_USERNAME: z.string().default(''),
+  PJE_PASSWORD: z.string().default(''),
+  PJE_SSO_URL: z.string().default('https://sso.cloud.pje.jus.br/auth/realms/pje/protocol/openid-connect/token'),
+  PJE_GATEWAY_URL: z.string().default('https://gateway.cloud.pje.jus.br'),
+  PJE_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
   PROCESS_MONITOR_ENABLED: z.string().default('false'),
   PROCESS_MONITOR_INTERVAL_MINUTES: z.coerce.number().int().positive().default(60),
   PROCESS_MONITOR_CONCURRENCY: z.coerce.number().int().positive().default(2),
+  PROCESS_MONITOR_STALE_MULTIPLIER: z.coerce.number().positive().default(2),
 });
 
 export type Env = z.infer<typeof envSchema>;

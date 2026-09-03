@@ -26,6 +26,7 @@ const icons: Record<string, string> = {
   tasks: 'M9 5h10M9 12h10M9 19h10M4 5l1.2 1.2L7.5 4M4 12l1.2 1.2L7.5 11M4 19l1.2 1.2L7.5 18',
   publications: 'M3 8.5 12 14l9-5.5M4 6h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1Z',
   documents: 'M6 3h7l5 5v13H6V3Zm7 0v5h5M9 13h6M9 17h6',
+  monitoring: 'M21 12a9 9 0 1 1-9-9M21 3l-9 9-2.5-2.5M16 3h5v5',
   leads: 'M4 18l5-5 3.5 3.5L20 9M20 9h-4.5M20 9v4.5',
   finance: 'M12 3v18M8.5 7.5h6.2a2.4 2.4 0 0 1 0 4.8H9.3a2.4 2.4 0 0 0 0 4.8h6.2',
   settings:
@@ -35,6 +36,7 @@ const icons: Record<string, string> = {
 const nav: Array<{ to: string; label: string; icon: string; group: string; end?: boolean; perm?: string; plan?: 'SOLO' | 'OFFICE' }> = [
   { to: '/', label: 'Visão Geral', end: true, icon: 'overview', group: 'Painel' },
   { to: '/processos', label: 'Processos', icon: 'processes', group: 'Operação', perm: 'processes.read' },
+  { to: '/monitoramento', label: 'Monitoramento', icon: 'monitoring', group: 'Operação', perm: 'processes.read' },
   { to: '/descoberta', label: 'Descoberta', icon: 'processes', group: 'Operação', perm: 'process_discovery.view' },
   { to: '/clientes', label: 'Clientes', icon: 'clients', group: 'Operação', perm: 'clients.read' },
   { to: '/tarefas', label: 'Tarefas', icon: 'tasks', group: 'Operação', perm: 'tasks.read' },

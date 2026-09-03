@@ -14,6 +14,7 @@ import Publications from './pages/Publications';
 import Documents from './pages/Documents';
 import Leads from './pages/Leads';
 import Settings from './pages/Settings';
+import Monitoring from './pages/Monitoring';
 import Finance from './pages/Finance';
 import Team from './pages/Team';
 import SuperAdmin from './pages/SuperAdmin';
@@ -81,6 +82,7 @@ export default function App() {
         <Route path="documentos" element={<RequireOrg><Documents /></RequireOrg>} />
         <Route path="leads" element={<RequireOrg><Leads /></RequireOrg>} />
         <Route path="financeiro" element={<RequireOrg><Finance /></RequireOrg>} />
+        <Route path="monitoramento" element={<RequireOrg><Monitoring /></RequireOrg>} />
         <Route path="configuracoes" element={<RequireOrg><Settings /></RequireOrg>} />
         <Route path="equipe" element={<RequireOrg><Team /></RequireOrg>} />
       </Route>

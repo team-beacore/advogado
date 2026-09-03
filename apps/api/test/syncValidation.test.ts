@@ -95,7 +95,9 @@ describe('ETAPA 8 — Validação final: falhas + notificações', () => {
     assert.ok(run.rows[0].error_message);
 
     const caseRowDb = await pool.query('SELECT last_synced_at, monitoring_status, last_sync_error FROM cases WHERE id = $1', [caseRow.id]);
-    assert.equal(caseRowDb.rows[0].monitoring_status, 'ERROR');
+    // ETAPA 10: indisponibilidade (UNAVAILABLE) é falha TEMPORÁRIA → o scheduler
+    // mantém o case ACTIVE para retentar no próximo ciclo (não fica preso em ERROR).
+    assert.equal(caseRowDb.rows[0].monitoring_status, 'ACTIVE');
     assert.ok(caseRowDb.rows[0].last_sync_error);
 
     // Eventos existentes NÃO foram apagados.

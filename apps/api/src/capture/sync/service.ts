@@ -4,11 +4,15 @@ import { auditLog } from '../../audit/audit';
 import { getNotificationPreferences } from '../../services/preferencesService';
 import { _getSourceConfig } from '../service';
 import { lookupDataJudProcess } from '../datajud/adapter';
+import { DataJudError, DATAJUD_ERROR_CODES } from '../datajud/errors';
+import { lookupPJeProcess } from '../pje/adapter';
 import { parseCNJ } from '../datajud/cnj';
 import type { NormalizedDataJudResult } from '../datajud/normalize';
 import type { CaptureSource } from '@advogado/shared';
 
-export type ProcessLookupFn = (processNumber: string, config: Record<string, unknown> | null) => Promise<NormalizedDataJudResult | null>;
+/** Resultado normalizado comum às fontes de sincronização (movements + metadados). */
+export type NormalizedLookupResult = Pick<NormalizedDataJudResult, 'movements' | 'metadata'> & { process?: unknown };
+export type ProcessLookupFn = (processNumber: string, config: Record<string, unknown> | null) => Promise<NormalizedLookupResult | null>;
 
 export type SyncStatus = 'SUCCESS' | 'PARTIAL' | 'FAILED';
 
@@ -61,6 +65,44 @@ function safeMessage(err: unknown): string {
   return 'Erro desconhecido.';
 }
 
+/** Códigos do DataJud considerados transitórios (a fonte deve ser retentada no próximo ciclo). */
+const TRANSIENT_DATAJUD_CODES = new Set<string>([
+  DATAJUD_ERROR_CODES.UNAVAILABLE,
+  DATAJUD_ERROR_CODES.TIMEOUT,
+  DATAJUD_ERROR_CODES.RATE_LIMITED,
+  DATAJUD_ERROR_CODES.BAD_RESPONSE,
+]);
+
+export interface SyncErrorClass {
+  code: string;
+  /** true = temporário (retentado no próximo ciclo); false = permanente (exige correção). */
+  transient: boolean;
+  /** Mensagem sanitizada (nunca contém secrets). */
+  message: string;
+}
+
+/**
+ * Classifica o erro de sincronização usando a taxonomia existente.
+ * - DataJudError: usa o código real (UNAUTHORIZED/TIMEOUT/UNAVAILABLE/...).
+ * - Demais erros: fallback heurístico baseado na mensagem sanitizada.
+ * Nunca registra a API key, Authorization header ou credenciais.
+ */
+export function classifySyncError(err: unknown): SyncErrorClass {
+  if (err instanceof DataJudError) {
+    return {
+      code: err.code,
+      transient: TRANSIENT_DATAJUD_CODES.has(err.code),
+      message: err.message,
+    };
+  }
+  const message = safeMessage(err);
+  if (/timeout|timed out|abort|tempo limite/i.test(message)) return { code: 'TIMEOUT', transient: true, message };
+  if (/rate.?limit|429|too many requests|limite de requisi/i.test(message)) return { code: 'RATE_LIMITED', transient: true, message };
+  if (/unavailable|indispon[ií]vel|503|502|network|fetch failed|econnrefused|conex[aã]o/i.test(message)) return { code: 'SOURCE_UNAVAILABLE', transient: true, message };
+  if (/authentication|auth|login|credential|401|403|token/i.test(message)) return { code: 'AUTHENTICATION_FAILED', transient: false, message };
+  return { code: 'UNKNOWN_ERROR', transient: false, message };
+}
+
 /**
  * Sincroniza um único processo contra sua fonte de dados.
  *
@@ -89,13 +131,16 @@ export async function syncCase(organizationId: string, caseId: string, userId: s
   const parsed = parseCNJ(processNumber);
   if (!parsed) throw errors.validation('Número CNJ inválido. Não é possível sincronizar.');
 
-  // 2. Determina fonte (DataJud é a fonte primária de monitoramento).
-  //    Futuramente poderá ser configurável por fonte por processo/instalação.
-  const source: CaptureSource = 'DATAJUD';
+  // 2. Determina fonte a partir do Case (default 'DATAJUD' para compatibilidade).
+  const caseSource = (caseRow.source as string) || 'DATAJUD';
+  const source: CaptureSource = caseSource === 'DATAJUD' || caseSource === 'PJE' ? caseSource : 'DATAJUD';
+
+  // 2b. Resolve modo de execução: DataJud é público, PJe é autenticado.
+  const mode = source === 'PJE' ? 'AUTHENTICATED' : 'PUBLIC';
 
   // 3. Resolve configuração da fonte.
   const config = await _getSourceConfig(organizationId, source);
-  const runId = await createRun(organizationId, caseId, processNumber, source, 'PUBLIC', userId);
+  const runId = await createRun(organizationId, caseId, processNumber, source, mode, userId);
 
   let movementsFound = 0;
   let inserted = 0;
@@ -105,10 +150,10 @@ export async function syncCase(organizationId: string, caseId: string, userId: s
   let status: SyncStatus = 'SUCCESS';
 
   try {
-    // 4. Consulta DataJud via lookup (chamada HTTP real).
+    // 4. Consulta a fonte via lookup (chamada HTTP real).
     void auditLog({ organizationId, userId, action: 'PROCESS_SYNC_STARTED', entity: 'case', entityId: caseId, after: { processNumber, source }, ip, metadata: { runId } });
 
-    const lookupFn = lookup ?? lookupDataJudProcess;
+    const lookupFn = lookup ?? (source === 'PJE' ? lookupPJeProcess : lookupDataJudProcess);
     const result = await lookupFn(processNumber, config);
     void auditLog({ organizationId, userId, action: 'PROCESS_SYNC_FETCHED', entity: 'case', entityId: caseId, after: { processNumber, source, found: result ? 1 : 0, movements: result?.movements.length ?? 0 }, ip });
 
@@ -162,15 +207,20 @@ export async function syncCase(organizationId: string, caseId: string, userId: s
       await notifyResponsibleForNewEvents(organizationId, caseId, caseRow, inserted, ip);
     }
   } catch (err) {
-    const msg = safeMessage(err);
+    const cls = classifySyncError(err);
     status = 'FAILED';
-    lastError = msg;
-    await finishRun(runId, status, { found: movementsFound, imported: inserted, duplicate: duplicates, errors: errorCount + 1 }, lastError);
+    lastError = cls.message;
+    const errorMessage = `${cls.code}: ${cls.message}`;
+    await finishRun(runId, status, { found: movementsFound, imported: inserted, duplicate: duplicates, errors: errorCount + 1 }, errorMessage);
+    // Falha temporária (indisponibilidade/timeout/rate-limit): mantém ACTIVE para o
+    // scheduler retentar no próximo ciclo. Falha permanente (auth/config/não encontrado):
+    // monitoramento para (ERROR) para não bombardear a fonte — exige correção humana.
+    const nextMonitoringStatus = cls.transient ? 'ACTIVE' : 'ERROR';
     await pool.query(
-      `UPDATE cases SET monitoring_status = 'ERROR', last_sync_error = $1, updated_at = now() WHERE id = $2`,
-      [msg, caseId],
+      `UPDATE cases SET monitoring_status = $1, last_sync_error = $2, updated_at = now() WHERE id = $3`,
+      [nextMonitoringStatus, errorMessage, caseId],
     );
-    void auditLog({ organizationId, userId, action: 'PROCESS_SYNC_FAILED', entity: 'case', entityId: caseId, after: { processNumber, source, error: msg }, ip, metadata: { runId } });
+    void auditLog({ organizationId, userId, action: 'PROCESS_SYNC_FAILED', entity: 'case', entityId: caseId, after: { processNumber, source, error: errorMessage, transient: cls.transient }, ip, metadata: { runId } });
   }
 
   return {

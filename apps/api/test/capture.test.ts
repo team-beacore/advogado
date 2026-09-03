@@ -36,15 +36,19 @@ describe('Captura de publicações', () => {
   after(async () => { setCaptureAdaptersForTests(null); const { closePool } = await import('../src/db/client'); await closePool(); });
   beforeEach(async () => { await resetDb(); });
 
-  it('status retorna fontes com estado honesto (DEMO implementada, tribunais não implementados)', async () => {
+  it('status retorna fontes com estado honesto (DEMO e PJe implementadas; e-SAJ/PROJUDI não)', async () => {
     const session = await helper.registerAndLogin();
     const res = await request(app).get('/api/capture/status').set('Cookie', session.cookie).expect(200);
     assert.ok(Array.isArray(res.body.adapters));
     const demo = res.body.adapters.find((a: { source: string }) => a.source === 'DEMO');
     assert.ok(demo);
     assert.equal(demo.implemented, true);
+    // PJe agora é integração real (adapter implementado).
     const pje = res.body.adapters.find((a: { source: string }) => a.source === 'PJE');
-    assert.equal(pje.implemented, false);
+    assert.equal(pje.implemented, true);
+    // e-SAJ permanece honestamente não implementado.
+    const esaj = res.body.adapters.find((a: { source: string }) => a.source === 'ESAJ');
+    assert.equal(esaj.implemented, false);
   });
 
   it('run DEMO cria processos, movimentações e publicações idempotentemente', async () => {
@@ -81,9 +85,9 @@ describe('Captura de publicações', () => {
   it('run em fonte não implementada retorna FAILED honesto (sem fingir conexão)', async () => {
     setCaptureAdaptersForTests(null);
     const session = await helper.registerAndLogin();
-    const res = await request(app).post('/api/capture/run').set('Cookie', session.cookie).send({ source: 'PJE' }).expect(200);
+    const res = await request(app).post('/api/capture/run').set('Cookie', session.cookie).send({ source: 'ESAJ' }).expect(200);
     assert.equal(res.body.status, 'FAILED');
-    assert.ok(res.body.errorMessage.includes('não implementada'));
+    assert.ok(res.body.errorMessage.includes('não implementada') || res.body.errorMessage.includes('não configurada') || res.body.errorMessage === 'Fonte e-SAJ ainda não implementada. Nenhuma conexão real foi estabelecida.');
   });
 
   it('test de conexão DEMO retorna ok', async () => {

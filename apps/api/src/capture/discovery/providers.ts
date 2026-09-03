@@ -9,6 +9,7 @@ import type {
 import { DEMO_PROCESSES, DEMO_MOVEMENTS, DEMO_PUBLICATIONS } from '../demo';
 import { DataJudDiscoveryProvider } from '../datajud/adapter';
 import { DjenDiscoveryProvider } from '../djen/provider';
+import { PJeDiscoveryProvider } from '../pje/adapter';
 
 /**
  * Providers de descoberta de processos.
@@ -143,20 +144,18 @@ class DemoDiscoveryProvider implements ProcessDiscoveryProvider {
 const dataJudDiscoveryProvider = new DataJudDiscoveryProvider();
 
 /**
- * PJe / e-SAJ / PROJUDI — integrações específicas por tribunal.
+ * PJe — integração real (PDPJ-Br, OAuth2). A API oficial do PJe permite
+ * consulta por número CNJ e movimentações, mas NÃO oferece descoberta por OAB
+ * (não há endpoint público de descoberta por advogado). Portanto:
+ *   supportsProfessionalDiscovery = false (nunca prometido).
+ *   supportsProcessLookup = true; supportsMovements = true; supportsDocuments = true.
+ */
+const pjeDiscoveryProvider = new PJeDiscoveryProvider();
+
+/**
+ * e-SAJ / PROJUDI — integrações específicas por tribunal.
  * Nenhuma implementação real validada ainda: capacidades permanecem vazias/falsas.
  */
-const pjeDiscoveryProvider = new UnavailableDiscoveryProvider('PJE', 'AUTHENTICATED', 'PJe', {
-  supportsProfessionalDiscovery: false,
-  supportsProcessLookup: false,
-  supportsMovements: false,
-  supportsPublications: false,
-  supportsDocuments: false,
-  requiresAuthentication: true,
-  supportedCourts: [],
-  supportedSystems: [],
-});
-
 const esajDiscoveryProvider = new UnavailableDiscoveryProvider('ESAJ', 'AUTHENTICATED', 'e-SAJ', {
   supportsProfessionalDiscovery: false,
   supportsProcessLookup: false,

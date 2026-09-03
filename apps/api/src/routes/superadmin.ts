@@ -5,6 +5,7 @@ import { getEnv } from '../config';
 import { getProviderInfo } from '../ai/registry';
 import { getStorage } from '../storage';
 import { auditLog } from '../audit/audit';
+import { getMonitorStatus } from '../capture/scheduler/service';
 import { ScryptHasher } from '../auth/password';
 import {
   getWizardState,
@@ -60,6 +61,7 @@ router.get('/status', requireSuperAdmin, async (req, res, next) => {
       storage: { driver: env.STORAGE_DRIVER, ok: storageOk },
       migrations: migrationsRes.rows[0]?.n ?? 0,
       ai: { provider: ai.name, configured: ai.configured },
+      monitoring: getMonitorStatus(),
       services: {
         api: true,
         database: dbOk,

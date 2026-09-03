@@ -14,6 +14,7 @@ import dashboardRoutes from './routes/dashboard';
 import settingsRoutes from './routes/settings';
 import financeRoutes from './routes/finance';
 import captureRoutes from './routes/capture';
+import monitoringRoutes from './routes/monitoring';
 import portalRoutes from './routes/portal';
 import superAdminRoutes from './routes/superadmin';
 import processDiscoveryRoutes from './routes/processDiscovery';
@@ -79,6 +80,7 @@ export function createApp() {
   app.use('/api/settings', settingsRoutes);
   app.use('/api/finance', financeRoutes);
   app.use('/api/capture', captureRoutes);
+  app.use('/api/monitoring', monitoringRoutes);
   app.use('/api/portal', portalRoutes);
   app.use('/api/superadmin', superAdminRoutes);
   app.use('/api/process-discovery', processDiscoveryRoutes);

@@ -23,6 +23,7 @@ interface ProcessDetail {
   last_synced_at: string | null;
   monitoring_status: string | null;
   last_sync_error: string | null;
+  monitoring_stale: boolean | null;
   events: Array<Record<string, unknown>>;
   documents: Array<Record<string, unknown>>;
   publications: Array<Record<string, unknown>>;
@@ -160,9 +161,17 @@ function Overview({ data, onRefresh }: { data: ProcessDetail; onRefresh: () => P
             <div className="flex items-center justify-between">
               <dt className="text-gray-500">Status</dt>
               <dd>
-                <Badge color={data.monitoring_status === 'ERROR' ? 'red' : data.monitoring_status === 'ACTIVE' ? 'green' : data.monitoring_status === 'PAUSED' ? 'yellow' : 'gray'}>
-                  {data.monitoring_status === 'ACTIVE' ? '🟢 Ativo' : data.monitoring_status === 'PAUSED' ? '⏸ Pausado' : data.monitoring_status === 'ERROR' ? '🔴 Erro' : '—'}
-                </Badge>
+                {(() => {
+                  const monErr = data.monitoring_status === 'ERROR' || Boolean(data.last_sync_error);
+                  const monStale = data.monitoring_status === 'ACTIVE' && !monErr && data.monitoring_stale === true;
+                  const badgeColor = monErr ? 'red' : monStale ? 'yellow' : data.monitoring_status === 'ACTIVE' ? 'green' : data.monitoring_status === 'PAUSED' ? 'yellow' : 'gray';
+                  const badgeText = data.monitoring_status === 'ACTIVE' && !monErr && !monStale ? '🟢 Monitoramento ativo'
+                    : monStale ? '🟡 Sincronização atrasada'
+                    : monErr ? '🔴 Monitoramento com erro'
+                    : data.monitoring_status === 'PAUSED' ? '⏸ Monitoramento pausado'
+                    : '—';
+                  return <Badge color={badgeColor}>{badgeText}</Badge>;
+                })()}
               </dd>
             </div>
             <div className="flex justify-between"><dt className="text-gray-500">Última sincronização</dt><dd className="font-medium text-gray-900">{formatDateTime(data.last_synced_at)}</dd></div>

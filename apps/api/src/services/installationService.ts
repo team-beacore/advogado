@@ -1,5 +1,5 @@
 import { getPool } from '../db/client';
-import { getEnv } from '../config';
+import { getEnv, loadEnv } from '../config';
 import { ScryptHasher } from '../auth/password';
 import { getStorage } from '../storage';
 import { saveChannelConfig } from '../notify/service';
@@ -299,6 +299,11 @@ export async function stepAI(state: WizardState, config: Record<string, unknown>
   }
   const test = provider === 'local' ? { ok: true, model: 'local-rules' } : await testAIConnection(config);
   if (test.ok) {
+    process.env.AI_PROVIDER = provider;
+    process.env.OPENAI_API_KEY = String(config.apiKey ?? '');
+    process.env.OPENAI_BASE_URL = String(config.baseUrl ?? 'https://api.openai.com/v1');
+    process.env.OPENAI_MODEL = String(config.model ?? 'gpt-4o-mini');
+    loadEnv();
     state.data = { ...state.data, ai: { provider, model: String(config.model ?? ''), testedAt: new Date().toISOString(), tested: true } };
     await markStep(state, 'ai', okState('IA configurada e testada.'), 6);
   } else {
