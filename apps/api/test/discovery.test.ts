@@ -85,8 +85,10 @@ describe('DESCOBERTA DE PROCESSOS — identidade profissional, descoberta, impor
     assert.equal(caseRow.rows[0].responsible_id, null);
 
     // movimentações descobertas foram importadas como eventos
+    // Contrato real de GET /processes/:id/events: retorna ARRAY (não envelope {items}).
     const events = await request(app).get(`/api/processes/${imp.body.caseId}/events`).set('Cookie', session.cookie).expect(200);
-    assert.ok(events.body.items.length > 0);
+    assert.ok(Array.isArray(events.body));
+    assert.ok(events.body.length > 0);
   });
 
   it('importar duas vezes o mesmo resultado é idempotente (não cria duplicata)', async () => {

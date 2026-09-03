@@ -136,7 +136,8 @@ export class DJENClient {
 
   /** Lista tribunais disponíveis (valida conectividade real). */
   async listTribunals(): Promise<Array<{ sigla?: string; nome?: string; jurisdicao?: string }>> {
-    const res = await this.rawGet('/api/v1/comunicacao/tribunal');
+    // rawGet recebe uma URL absoluta; prefixamos o baseUrl (mesmo padrão do get()).
+    const res = await this.rawGet(`${this.baseUrl}/api/v1/comunicacao/tribunal`);
     this.assertStatus(res.status);
     const payload = (await res.json()) as unknown;
     if (!Array.isArray(payload)) throw new DJENError(DJEN_ERROR_CODES.BAD_RESPONSE);

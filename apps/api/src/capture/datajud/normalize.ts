@@ -1,13 +1,21 @@
 import { formatCNJ } from './cnj';
-import type { ExternalMovement, ExternalProcess } from '../types';
+import type { ExternalComplement, ExternalMovement, ExternalProcess, ExternalSubject } from '../types';
 import type { DataJudSource } from './types';
 
 /**
  * Normaliza o documento `_source` do DataJud para o formato interno
  * (ExternalProcess / ExternalMovement) consumido pelo engine de captura.
  *
- * O payload original NÃO é armazenado integralmente: apenas campos úteis e
- * controlados são preservados em metadados.
+ * ETAPA 12A — correção da normalização:
+ *  - assuntos, formato, código municipal do órgão julgador e estrutura das
+ *    movimentações (codigo/nome/complementosTabelados) NÃO são mais descartados;
+ *  - o payload útil é promovido a campos canônicos (class_code/name, degree,
+ *    filing_date, source_last_updated_at, judicial_system) ou preservado em
+ *    metadata.dataJud;
+ *  - nenhum dado é inventado: valor disponível → preenche; indisponível → null/ausente.
+ *
+ * O payload original NÃO é armazenado integralmente (LGPD/tamanho/segurança):
+ * apenas os dados relevantes sobrevivem no modelo normalizado + metadata.
  */
 
 /** Converte datas do DataJud para Date (aceita os 3 formatos existentes). */
@@ -45,12 +53,18 @@ function toIso(value: unknown): string | null {
 }
 
 interface DataJudMovementLike {
+  id?: unknown;
   codigo?: unknown;
   nome?: string | null;
   descricao?: string | null;
   dataHora?: unknown;
   complementosTabelados?: Array<{ codigo?: unknown; descricao?: string | null; nome?: string | null; valor?: unknown }> | null;
   movimentoNacional?: { codigo?: unknown; nome?: string | null } | null;
+}
+
+function codeToStr(value: unknown): string | null {
+  if (value == null) return null;
+  return String(value);
 }
 
 function movementDescription(mov: DataJudMovementLike): string {
@@ -67,6 +81,31 @@ function movementReference(mov: DataJudMovementLike): string {
   return `datajud-mov-${String(codigo ?? '?')}-${stamp}`;
 }
 
+function movementComplements(mov: DataJudMovementLike): ExternalComplement[] | null {
+  const list = mov.complementosTabelados ?? [];
+  if (list.length === 0) return null;
+  return list.map((c) => ({
+    code: codeToStr(c.codigo),
+    value: c.valor != null ? String(c.valor) : null,
+    name: c.nome ?? null,
+    description: c.descricao ?? null,
+  }));
+}
+
+/** Normaliza assuntos (preservando codigo + nome). Nunca descarta. */
+function normalizeSubjects(raw: unknown): ExternalSubject[] | null {
+  if (!Array.isArray(raw)) return null;
+  const subjects: ExternalSubject[] = [];
+  for (const s of raw) {
+    const obj = (typeof s === 'object' && s !== null ? s : {}) as Record<string, unknown>;
+    const name = typeof obj.nome === 'string' && obj.nome ? obj.nome : null;
+    const code = codeToStr(obj.codigo);
+    if (!name && !code) continue;
+    subjects.push({ code, name });
+  }
+  return subjects.length > 0 ? subjects : null;
+}
+
 export interface NormalizedDataJudResult {
   process: ExternalProcess;
   movements: ExternalMovement[];
@@ -81,29 +120,50 @@ export function normalizeDataJudSource(raw: DataJudSource | Record<string, unkno
 
   const classe = source.classe ?? null;
   const sistema = source.sistema ?? null;
+  const formato = source.formato ?? null;
   const orgao = source.orgaoJulgador ?? null;
   const tribunal = typeof source.tribunal === 'string' ? source.tribunal : '';
 
   const movimentosRaw = Array.isArray(source.movimentos) ? (source.movimentos as unknown as DataJudMovementLike[]) : [];
   const movements = movimentosRaw.map((m) => {
     const date = toIso(m.dataHora);
+    const baseName = typeof m.movimentoNacional?.nome === 'string' ? m.movimentoNacional.nome : m.nome;
+    const baseCode = m.movimentoNacional?.codigo ?? m.codigo;
     return {
       processNumber: mask,
       date,
+      occurredAt: date,
       description: movementDescription(m),
       sourceReference: movementReference(m),
+      code: codeToStr(baseCode),
+      name: baseName ?? null,
+      complements: movementComplements(m),
+      metadata: m.movimentoNacional ? { movimentoNacional: { codigo: codeToStr(m.movimentoNacional.codigo), nome: m.movimentoNacional.nome ?? null } } : undefined,
     } as ExternalMovement;
   });
 
   const className = typeof classe?.nome === 'string' ? classe.nome : null;
   const systemName = typeof sistema?.nome === 'string' ? sistema.nome : null;
+  const subjects = normalizeSubjects(source.assuntos);
   const lastMovement = movements.length > 0 ? movements[movements.length - 1] : undefined;
 
   const process: ExternalProcess = {
     processNumber: mask,
     title: className ? `${className}` : `Processo ${mask}`,
     court: tribunal || undefined,
-    area: systemName ?? undefined,
+    // area NÃO recebe sistema processual (semântica de área jurídica).
+    area: undefined,
+    classCode: classe?.codigo ?? null,
+    className,
+    judicialSystem: systemName,
+    judicialSystemCode: sistema?.codigo ?? null,
+    degree: source.grau ?? null,
+    filingDate: toIso(source.dataAjuizamento),
+    sourceLastUpdatedAt: toIso(source.dataHoraUltimaAtualizacao),
+    subjects,
+    courtName: typeof orgao?.nome === 'string' ? orgao.nome : null,
+    courtCode: orgao?.codigo ?? null,
+    courtCityCode: orgao?.codigoMunicipioIBGE ?? null,
     parties: undefined,
   };
 
@@ -115,7 +175,11 @@ export function normalizeDataJudSource(raw: DataJudSource | Record<string, unkno
       nivelSigilo: source.nivelSigilo ?? null,
       classe: classe ? { codigo: classe.codigo ?? null, nome: className } : null,
       sistema: sistema ? { codigo: sistema.codigo ?? null, nome: systemName } : null,
-      orgaoJulgador: orgao ? { codigo: orgao.codigo ?? null, nome: orgao.nome ?? null } : null,
+      formato: formato ? { codigo: formato.codigo ?? null, nome: formato.nome ?? null } : null,
+      orgaoJulgador: orgao
+        ? { codigo: orgao.codigo ?? null, nome: orgao.nome ?? null, codigoMunicipioIBGE: orgao.codigoMunicipioIBGE ?? null }
+        : null,
+      assuntos: subjects,
       dataAjuizamento: toIso(source.dataAjuizamento),
       dataHoraUltimaAtualizacao: toIso(source.dataHoraUltimaAtualizacao),
       lastMovementAt: lastMovement ? lastMovement.date : null,

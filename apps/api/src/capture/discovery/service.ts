@@ -71,13 +71,6 @@ async function getIdentityByUser(organizationId: string, userId: string) {
   };
 }
 
-/** Verifica se um processo descoberto já existe como Case na organização (dedup por número CNJ). */
-async function caseExistsByNumber(organizationId: string, processNumber: string): Promise<boolean> {
-  const pool = getPool();
-  const res = await pool.query('SELECT id FROM cases WHERE organization_id = $1 AND process_number = $2', [organizationId, processNumber]);
-  return res.rows.length > 0;
-}
-
 /** Verifica se um resultado de descoberta já existe para o processo (dedup por CNJ na organização). */
 async function resultExists(organizationId: string, processNumber: string): Promise<boolean> {
   const pool = getPool();
@@ -94,8 +87,12 @@ async function persistResults(organizationId: string, identityId: string | null,
   let duplicate = 0;
   for (const p of processes) {
     if (!p.processNumber) continue;
-    if (await caseExistsByNumber(organizationId, p.processNumber)) { duplicate += 1; continue; }
     if (await resultExists(organizationId, p.processNumber)) { duplicate += 1; continue; }
+
+    // Se já existe um Case com o mesmo CNJ, o resultado NÃO é descartado: é persistido
+    // com status DUPLICATE vinculado ao Case existente (o advogado vê "Já cadastrado").
+    const existingCase = await pool.query('SELECT id FROM cases WHERE organization_id = $1 AND process_number = $2', [organizationId, p.processNumber]);
+    const existingCaseId = existingCase.rows.length > 0 ? (existingCase.rows[0].id as string) : null;
 
     // Fonte primária = primeira fonte que encontrou (lista completa fica em metadata.sources)
     const sources = (p.sources?.length ? p.sources : [p.source]) as CaptureSource[];
@@ -105,9 +102,10 @@ async function persistResults(organizationId: string, identityId: string | null,
     await pool.query(
       `INSERT INTO process_discovery_results
          (organization_id, professional_identity_id, run_id, source, process_number, court, court_code,
-          judicial_system, external_process_id, title, area, class, subjects, last_movement, last_movement_at,
-          status, confidence, metadata, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'PENDING_REVIEW', $16, $17, $18)`,
+          judicial_system, judicial_system_code, class_code, external_process_id, title, area, class,
+          degree, filing_date, source_last_updated_at, subjects, last_movement, last_movement_at,
+          status, confidence, metadata, imported_case_id, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)`,
       [
         organizationId,
         identityId,
@@ -117,13 +115,19 @@ async function persistResults(organizationId: string, identityId: string | null,
         p.court ?? null,
         p.courtCode ?? null,
         p.judicialSystem ?? null,
+        p.judicialSystemCode ?? null,
+        p.classCode ?? null,
         p.externalProcessId ?? null,
         p.title ?? null,
         p.area ?? null,
         p.class ?? null,
+        p.degree ?? null,
+        p.filingDate ? new Date(p.filingDate).toISOString() : null,
+        p.sourceLastUpdatedAt ? new Date(p.sourceLastUpdatedAt).toISOString() : null,
         p.subjects ? JSON.stringify(p.subjects) : null,
         p.lastMovement ?? null,
         p.lastMovementAt ? new Date(p.lastMovementAt).toISOString() : null,
+        existingCaseId ? 'DUPLICATE' : 'PENDING_REVIEW',
         confidence === 'HIGH' ? 1 : confidence === 'MEDIUM' ? 0.5 : confidence === 'LOW' ? 0.2 : 0,
         p.metadata || p.movements || p.publications || p.parties || sources.length > 1
           ? JSON.stringify({
@@ -135,10 +139,11 @@ async function persistResults(organizationId: string, identityId: string | null,
               publications: p.publications ?? [],
             })
           : null,
+        existingCaseId,
         userId,
       ],
     );
-    created += 1;
+    if (existingCaseId) duplicate += 1; else created += 1;
   }
   return { created, duplicate };
 }
@@ -506,9 +511,27 @@ export async function importDiscoveryResult(organizationId: string, id: string, 
 
     const title = result.title || `Processo ${result.process_number}`;
     const caseRes = await client.query(
-      `INSERT INTO cases (organization_id, client_id, title, process_number, court, area, responsible_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-      [organizationId, clientId, title, result.process_number, result.court ?? null, result.area ?? null, responsibleId],
+      `INSERT INTO cases (organization_id, client_id, title, process_number, court, area, class_code, class_name, judicial_system, judicial_system_code, degree, filing_date, source_last_updated_at, subjects, responsible_id, source_metadata, source)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING id`,
+      [
+        organizationId,
+        clientId,
+        title,
+        result.process_number,
+        result.court ?? null,
+        result.area ?? null,
+        result.class_code ?? null,
+        result.class ?? null,
+        result.judicial_system ?? null,
+        result.judicial_system_code ?? null,
+        result.degree ?? null,
+        result.filing_date ? new Date(result.filing_date).toISOString() : null,
+        result.source_last_updated_at ? new Date(result.source_last_updated_at).toISOString() : null,
+        result.subjects ? JSON.stringify(result.subjects) : null,
+        responsibleId,
+        result.metadata ? JSON.stringify(result.metadata) : null,
+        result.source ?? 'DATAJUD',
+      ],
     );
     caseId = caseRes.rows[0].id as string;
 
@@ -545,7 +568,16 @@ export async function importDiscoveryResult(organizationId: string, id: string, 
   for (const mov of movements) {
     try {
       if (mov.description && !(await existsMovement(caseId, result.source, mov.sourceReference, mov.description))) {
-        await addEvent({ processId: caseId, type: 'CAPTURE_MOVEMENT', title: mov.description, description: mov.description, source: result.source, sourceReference: mov.sourceReference ?? null, createdBy: userId });
+        await addEvent({
+          processId: caseId,
+          type: 'CAPTURE_MOVEMENT',
+          title: mov.description,
+          description: mov.description,
+          source: result.source,
+          sourceReference: mov.sourceReference ?? null,
+          occurredAt: mov.date ?? null,
+          createdBy: userId,
+        });
       }
     } catch {
       // nunca derruba a importação por causa de um movimento

@@ -101,13 +101,63 @@ async function listOrgProcessNumbers(organizationId: string): Promise<string[]> 
   return res.rows.map((r) => String(r.process_number));
 }
 
-async function findProcessByNumberWithTitle(organizationId: string, np: { processNumber: string; title?: string | null }, userId?: string | null): Promise<{ id: string; created: boolean }> {
+async function findProcessByNumberWithTitle(organizationId: string, np: { processNumber: string; title?: string | null; court?: string | null; area?: string | null; classCode?: string | number | null; className?: string | null; judicialSystem?: string | null; judicialSystemCode?: string | number | null; degree?: string | null; filingDate?: string | null; sourceLastUpdatedAt?: string | null; subjects?: Array<{ code?: string | number | null; name?: string | null }> | null; metadata?: Record<string, unknown> | null }, userId?: string | null): Promise<{ id: string; created: boolean }> {
   const pool = getPool();
   const existing = await pool.query('SELECT id FROM cases WHERE organization_id = $1 AND process_number = $2', [organizationId, np.processNumber]);
-  if (existing.rows.length > 0) return { id: existing.rows[0].id, created: false };
+  if (existing.rows.length > 0) {
+    // Preenche campos canônicos ausentes (nunca sobrescreve dados já existentes).
+    await pool.query(
+      `UPDATE cases SET
+         court = COALESCE(court, $2),
+         area = COALESCE(area, $3),
+         class_code = COALESCE(class_code, $4),
+         class_name = COALESCE(class_name, $5),
+         judicial_system = COALESCE(judicial_system, $6),
+         judicial_system_code = COALESCE(judicial_system_code, $7),
+         degree = COALESCE(degree, $8),
+         filing_date = COALESCE(filing_date, $9),
+         source_last_updated_at = COALESCE(source_last_updated_at, $10),
+         subjects = COALESCE(subjects, $11),
+         source_metadata = COALESCE(source_metadata, $12),
+         updated_at = now()
+       WHERE id = $1`,
+      [
+        existing.rows[0].id,
+        np.court ?? null,
+        np.area ?? null,
+        np.classCode != null ? String(np.classCode) : null,
+        np.className ?? null,
+        np.judicialSystem ?? null,
+        np.judicialSystemCode != null ? String(np.judicialSystemCode) : null,
+        np.degree ?? null,
+        np.filingDate ? new Date(np.filingDate).toISOString() : null,
+        np.sourceLastUpdatedAt ? new Date(np.sourceLastUpdatedAt).toISOString() : null,
+        np.subjects ? JSON.stringify(np.subjects) : null,
+        np.metadata ? JSON.stringify(np.metadata) : null,
+      ],
+    );
+    return { id: existing.rows[0].id, created: false };
+  }
   const res = await pool.query(
-    `INSERT INTO cases (organization_id, title, process_number, responsible_id) VALUES ($1, $2, $3, $4) RETURNING id`,
-    [organizationId, np.title?.trim() || `Processo ${np.processNumber}`, np.processNumber, userId ?? null],
+    `INSERT INTO cases (organization_id, title, process_number, responsible_id, court, area, class_code, class_name, judicial_system, judicial_system_code, degree, filing_date, source_last_updated_at, subjects, source_metadata)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id`,
+    [
+      organizationId,
+      np.title?.trim() || `Processo ${np.processNumber}`,
+      np.processNumber,
+      userId ?? null,
+      np.court ?? null,
+      np.area ?? null,
+      np.classCode != null ? String(np.classCode) : null,
+      np.className ?? null,
+      np.judicialSystem ?? null,
+      np.judicialSystemCode != null ? String(np.judicialSystemCode) : null,
+      np.degree ?? null,
+      np.filingDate ? new Date(np.filingDate).toISOString() : null,
+      np.sourceLastUpdatedAt ? new Date(np.sourceLastUpdatedAt).toISOString() : null,
+      np.subjects ? JSON.stringify(np.subjects) : null,
+      np.metadata ? JSON.stringify(np.metadata) : null,
+    ],
   );
   const caseId = res.rows[0].id;
   if (userId) {
@@ -260,7 +310,17 @@ export async function runCapture(
   // 4) Normalização
   const normalizer = new ProcessNormalizer(source, mode);
   const normalizedProcesses = result.processes.map((p) => normalizer.process(p));
-  const normalizedMovements = result.movements.map((m) => normalizer.movement({ processNumber: m.processNumber, date: m.date ?? null, description: m.description, sourceReference: m.sourceReference }));
+  const normalizedMovements = result.movements.map((m) => normalizer.movement({
+    processNumber: m.processNumber,
+    date: m.date ?? null,
+    occurredAt: m.occurredAt ?? null,
+    description: m.description,
+    sourceReference: m.sourceReference,
+    code: m.code ?? null,
+    name: m.name ?? null,
+    complements: m.complements ?? null,
+    metadata: m.metadata ?? null,
+  }));
   const normalizedPublications = result.publications.map((p) => normalizer.publication({ processNumber: p.processNumber, content: p.content, publicationDate: p.publicationDate ?? null, availabilityDate: p.availabilityDate ?? null, externalReference: p.externalReference ?? null, possibleDueDate: p.possibleDueDate ?? null, notes: p.notes ?? null }));
   steps.push({ name: 'Normalização', status: 'OK', message: 'Dados normalizados' });
 
@@ -297,6 +357,10 @@ export async function runCapture(
         description: mov.description,
         source,
         sourceReference: mov.sourceReference,
+        occurredAt: mov.occurredAt ?? mov.date,
+        eventCode: mov.code,
+        eventName: mov.name,
+        eventMetadata: (mov.complements || mov.metadata) ? { complements: mov.complements ?? [], ...(mov.metadata ?? {}) } : null,
         createdBy: userId,
       });
       counters.imported += 1;

@@ -167,11 +167,22 @@ export async function syncCase(organizationId: string, caseId: string, userId: s
         const sourceRef = mov.sourceReference ?? null;
         try {
           const insertRes = await pool.query(
-            `INSERT INTO case_events (process_id, type, title, description, source, source_reference, created_by)
-             VALUES ($1, 'CAPTURE_MOVEMENT', $2, $3, $4, $5, $6)
+            `INSERT INTO case_events (process_id, type, title, description, source, source_reference, created_by, occurred_at, event_code, event_name, event_metadata)
+             VALUES ($1, 'CAPTURE_MOVEMENT', $2, $3, $4, $5, $6, $7, $8, $9, $10)
              ON CONFLICT (process_id, source, source_reference) WHERE source_reference IS NOT NULL DO NOTHING
              RETURNING id`,
-            [caseId, mov.description, mov.description, source, sourceRef, userId],
+            [
+              caseId,
+              mov.description,
+              mov.description,
+              source,
+              sourceRef,
+              userId,
+              mov.occurredAt ? new Date(mov.occurredAt).toISOString() : (mov.date ? new Date(mov.date).toISOString() : null),
+              mov.code != null ? String(mov.code) : null,
+              mov.name ?? null,
+              (mov.complements || mov.metadata) ? JSON.stringify({ complements: mov.complements ?? [], ...(mov.metadata ?? {}) }) : null,
+            ],
           );
           if (insertRes.rows.length > 0) {
             inserted += 1;
@@ -184,7 +195,45 @@ export async function syncCase(organizationId: string, caseId: string, userId: s
         }
       }
 
-      // 5b. Publicações — DataJud não oferece; preparado para futuras fontes.
+      // 5b. Atualiza campos canônicos do Case a partir da fonte (sem sobrescrever dados já existentes).
+      const proc = result.process as (Record<string, unknown> & { court?: string | null; area?: string | null; classCode?: string | number | null; className?: string | null; judicialSystem?: string | null; judicialSystemCode?: string | number | null; degree?: string | null; filingDate?: string | null; sourceLastUpdatedAt?: string | null; subjects?: Array<{ code?: string | number | null; name?: string | null }> | null }) | undefined;
+      const sourceMetadata = result.metadata && typeof result.metadata === 'object' && Object.keys(result.metadata).length > 0
+        ? result.metadata
+        : null;
+      if (proc || sourceMetadata) {
+        await pool.query(
+          `UPDATE cases SET
+             court = COALESCE(court, $2),
+             area = COALESCE(area, $3),
+             class_code = COALESCE(class_code, $4),
+             class_name = COALESCE(class_name, $5),
+             judicial_system = COALESCE(judicial_system, $6),
+             judicial_system_code = COALESCE(judicial_system_code, $7),
+             degree = COALESCE(degree, $8),
+             filing_date = COALESCE(filing_date, $9),
+             source_last_updated_at = COALESCE(source_last_updated_at, $10),
+             subjects = COALESCE(subjects, $11),
+             source_metadata = COALESCE(source_metadata, $12),
+             updated_at = now()
+           WHERE id = $1`,
+          [
+            caseId,
+            proc?.court ?? null,
+            proc?.area ?? null,
+            proc?.classCode != null ? String(proc.classCode) : null,
+            proc?.className ?? null,
+            proc?.judicialSystem ?? null,
+            proc?.judicialSystemCode != null ? String(proc.judicialSystemCode) : null,
+            proc?.degree ?? null,
+            proc?.filingDate ? new Date(proc.filingDate).toISOString() : null,
+            proc?.sourceLastUpdatedAt ? new Date(proc.sourceLastUpdatedAt).toISOString() : null,
+            proc?.subjects ? JSON.stringify(proc.subjects) : null,
+            sourceMetadata ? JSON.stringify(sourceMetadata) : null,
+          ],
+        );
+      }
+
+      // 5c. Publicações — DataJud não oferece; preparado para futuras fontes.
       // (Para DJEN ou outras fontes que retornam publicações, a inserção seria análoga.)
     }
 

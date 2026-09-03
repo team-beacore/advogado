@@ -157,11 +157,11 @@ describe('CAPTURE PROFISSIONAL — engine, idempotência, isolamento, permissõe
     assert.ok(runs.body.items.length >= 1);
   });
 
-  it('fonte não implementada (PJe) retorna FAILED honesto', async () => {
+  it('fonte implementada sem configuração (PJe) retorna FAILED honesto (não configurado)', async () => {
     const session = await helper.registerAndLogin();
     const res = await request(app).post('/api/capture/run').set('Cookie', session.cookie).send({ source: 'PJE' }).expect(200);
     assert.equal(res.body.status, 'FAILED');
-    assert.ok(res.body.errorMessage.includes('não implementada'));
+    assert.ok(res.body.errorMessage.includes('não configurada'));
   });
 
   it('limpeza de dados DEMO não remove dados reais', async () => {

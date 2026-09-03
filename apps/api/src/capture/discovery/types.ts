@@ -46,8 +46,13 @@ export interface DiscoveryCapabilities {
 /** Movimentação descoberta em uma fonte. */
 export interface DiscoveredMovement {
   date?: string | null;
+  occurredAt?: string | null;
   description: string;
   sourceReference?: string | null;
+  code?: string | number | null;
+  name?: string | null;
+  complements?: Array<{ code?: string | number | null; value?: string | number | null; name?: string | null; description?: string | null }> | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 /** Publicação/intimação descoberta em uma fonte. */
@@ -67,10 +72,15 @@ export interface DiscoveredProcess {
   court?: string | null;
   courtCode?: string | null;
   judicialSystem?: string | null;
+  judicialSystemCode?: string | null;
+  classCode?: string | null;
   externalProcessId?: string | null;
   title?: string | null;
   area?: string | null;
   class?: string | null;
+  degree?: string | null;
+  filingDate?: string | null;
+  sourceLastUpdatedAt?: string | null;
   subjects?: string[] | null;
   lastMovement?: string | null;
   lastMovementAt?: string | null;

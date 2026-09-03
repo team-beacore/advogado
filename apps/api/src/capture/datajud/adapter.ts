@@ -149,6 +149,8 @@ export class DataJudCaptureAdapter implements CaptureAdapter {
         const source = DataJudClient.firstSource(envelope);
         if (!source) continue; // processo não encontrado — resultado legítimo
         const normalized = normalizeDataJudSource(source);
+        // Anexa metadata específica da fonte ao processo (persistida como source_metadata).
+        normalized.process.metadata = normalized.metadata;
         processes.push(normalized.process);
         movements.push(...normalized.movements);
       } catch (err) {

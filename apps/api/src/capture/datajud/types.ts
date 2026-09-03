@@ -12,7 +12,7 @@ export interface DataJudSource {
   grau?: string;
   nivelSigilo?: number;
   classe?: { codigo?: number; nome?: string } | null;
-  assuntos?: unknown;
+  assuntos?: Array<{ codigo?: number | string; nome?: string }> | null;
   orgaoJulgador?: { codigo?: number; nome?: string; codigoMunicipioIBGE?: number } | null;
   sistema?: { codigo?: number; nome?: string } | null;
   formato?: { codigo?: number; nome?: string } | null;

@@ -73,8 +73,27 @@ async function main() {
   await pool.end();
   console.log('[test] Database ready. Running tests...');
 
-  const env = { ...process.env, DATABASE_URL: `postgres://${user}:${password}@127.0.0.1:${port}/${database}`, NODE_ENV: 'test', OPENAI_API_KEY: '', AI_PROVIDER: 'openai' };
-  const testProc = spawn(process.platform === 'win32' ? 'npx.cmd' : 'npx', ['tsx', '--test', '--test-concurrency=1', 'test/*.test.ts'], { cwd: __dirname, stdio: 'inherit', env, shell: true });
+  // ETAPA 13 (Fase 14): testes unitários assumem ambiente SEM credencial configurada.
+  // O valor real do .env NÃO é removido do arquivo — apenas não é injetado no processo
+  // de teste (dotenv não sobrescreve variáveis já presentes). Isso separa:
+  //   - teste sem configuração (unitário, env vazio);
+  //   - teste configurado (config explícita passada no teste);
+  //   - validação real (script dedicado, com a credencial do ambiente).
+  const env = {
+    ...process.env,
+    DATABASE_URL: `postgres://${user}:${password}@127.0.0.1:${port}/${database}`,
+    NODE_ENV: 'test',
+    OPENAI_API_KEY: '',
+    AI_PROVIDER: 'openai',
+    DATAJUD_API_KEY: '',
+    PJE_CLIENT_ID: '',
+    PJE_CLIENT_SECRET: '',
+    PJE_USERNAME: '',
+    PJE_PASSWORD: '',
+  };
+  // Suporte a testes direcionados: TEST_FILES="test/datajud.test.ts test/pje.test.ts" npm test
+  const pattern = process.env.TEST_FILES ? process.env.TEST_FILES.split(',').map((s) => s.trim()).filter(Boolean) : ['test/*.test.ts'];
+  const testProc = spawn(process.platform === 'win32' ? 'npx.cmd' : 'npx', ['tsx', '--test', '--test-concurrency=1', ...pattern], { cwd: __dirname, stdio: 'inherit', env, shell: true });
   testProc.on('exit', async (code) => {
     await pg.stop();
     process.exit(code ?? 0);

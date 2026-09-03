@@ -134,7 +134,7 @@ export class PJeCaptureAdapter implements CaptureAdapter {
         const movs = await client.fetchMovements(header.id!);
         const enriched = { ...header, movimentos: movs };
         const normalized = normalizePJeProcess(enriched as Parameters<typeof normalizePJeProcess>[0]);
-        processes.push(normalized.process);
+        processes.push({ ...normalized.process, metadata: normalized.metadata });
         movements.push(...normalized.movements);
       } catch (err) {
         if (err instanceof PJeError) {

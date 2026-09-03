@@ -66,9 +66,11 @@ export class DjenDiscoveryProvider implements ProcessDiscoveryProvider {
           court: item.siglaTribunal ?? null,
           courtCode: item.siglaTribunal ?? null,
           judicialSystem: 'DJEN',
+          judicialSystemCode: null,
           externalProcessId: String(item.id),
           title: item.nomeClasse ?? null,
           class: item.nomeClasse ?? null,
+          classCode: item.codigoClasse != null ? String(item.codigoClasse) : null,
           lastMovement: item.tipoComunicacao ? `Comunicação: ${item.tipoComunicacao}` : null,
           lastMovementAt: item.data_disponibilizacao ?? null,
           publications: [{

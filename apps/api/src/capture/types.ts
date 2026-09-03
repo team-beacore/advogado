@@ -28,25 +28,71 @@ export const CAPTURE_ERROR_MESSAGES: Record<CaptureErrorCode, string> = {
   UNKNOWN_ERROR: 'Erro desconhecido na captura.',
 };
 
+/** Assunto processual normalizado (multi-fonte). */
+export interface ExternalSubject {
+  code?: string | number | null;
+  name?: string | null;
+}
+
+/** Complemento tabelado de uma movimentação (estrutura preservada). */
+export interface ExternalComplement {
+  code?: string | number | null;
+  value?: string | number | null;
+  name?: string | null;
+  description?: string | null;
+}
+
 /**
  * Processo no formato da fonte externa (pré-normalização).
+ *
+ * Campos canônicos comuns (A/B/C/D do modelo ETAPA 12A):
+ *  - Identidade: processNumber, source, sourceReference
+ *  - Processuais comuns: court, judicialSystem, class, degree, filingDate, lastUpdatedAt, órgão, subjects
+ *  - Específicos da fonte: metadata (bloco metadata.dataJud / metadata.pje)
  */
 export interface ExternalProcess {
   processNumber: string;
   title?: string | null;
   court?: string | null;
+  /** Área jurídica (semântica correta). NÃO deve receber sistema processual. */
   area?: string | null;
   parties?: string[] | null;
+  classCode?: string | number | null;
+  className?: string | null;
+  judicialSystem?: string | null;
+  judicialSystemCode?: string | number | null;
+  degree?: string | null;
+  filingDate?: string | null;
+  sourceLastUpdatedAt?: string | null;
+  subjects?: ExternalSubject[] | null;
+  /** Órgão julgador (nome e, quando disponível, código). */
+  courtName?: string | null;
+  courtCode?: string | number | null;
+  courtCityCode?: string | number | null;
+  /** Metadados específicos da fonte (nunca inventados). */
+  metadata?: Record<string, unknown> | null;
 }
 
 /**
  * Movimentação no formato da fonte externa.
+ *
+ * Campos canônicos comuns:
+ *  - occurredAt: data/hora do evento NA FONTE (não é created_at da aplicação)
+ *  - code/name: código e nome da movimentação (ex.: movimentos.codigo / .nome)
+ *  - complements: complementosTabelados estruturados (preservados, não só texto)
+ *  - metadata: metadados específicos da fonte
  */
 export interface ExternalMovement {
   processNumber: string;
+  /** Data/hora do movimento (compatibilidade: equivale a occurredAt quando presente). */
   date?: string | null;
+  occurredAt?: string | null;
   description: string;
   sourceReference?: string | null;
+  code?: string | number | null;
+  name?: string | null;
+  complements?: ExternalComplement[] | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 /**
@@ -69,6 +115,8 @@ export interface CaptureFetchResult {
   processes: ExternalProcess[];
   movements: ExternalMovement[];
   publications: ExternalPublication[];
+  /** Metadados específicos da fonte (ex.: metadata.dataJud) preservados na captura. */
+  metadata?: Record<string, unknown> | null;
 }
 
 /**

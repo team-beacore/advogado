@@ -69,6 +69,12 @@ export function aggregateProcesses(processes: DiscoveredProcess[]): DiscoveredPr
     if (!existing.court && p.court) existing.court = p.court;
     if (!existing.courtCode && p.courtCode) existing.courtCode = p.courtCode;
     if (!existing.class && p.class) existing.class = p.class;
+    if (!existing.classCode && p.classCode) existing.classCode = p.classCode;
+    if (!existing.judicialSystem && p.judicialSystem) existing.judicialSystem = p.judicialSystem;
+    if (!existing.judicialSystemCode && p.judicialSystemCode) existing.judicialSystemCode = p.judicialSystemCode;
+    if (!existing.degree && p.degree) existing.degree = p.degree;
+    if (!existing.filingDate && p.filingDate) existing.filingDate = p.filingDate;
+    if (!existing.sourceLastUpdatedAt && p.sourceLastUpdatedAt) existing.sourceLastUpdatedAt = p.sourceLastUpdatedAt;
     if (!existing.lastMovementAt && p.lastMovementAt) existing.lastMovementAt = p.lastMovementAt;
     if (!existing.lastMovement && p.lastMovement) existing.lastMovement = p.lastMovement;
     existing.metadata = { ...(existing.metadata ?? {}), ...(p.metadata ?? {}), sources };
