@@ -86,7 +86,7 @@ export default function Profile() {
     try {
       await apiPatch('/api/auth/me', { name: name.trim(), phone: phone.trim() });
       await refresh();
-      setPersonalMsg('✅ Dados pessoais salvos.');
+      setPersonalMsg('Dados pessoais salvos.');
     } catch (err) { setPersonalError(err); }
     finally { setPersonalSaving(false); }
   };
@@ -103,7 +103,7 @@ export default function Profile() {
       });
       const me = await apiGet<{ identity: Identity | null }>('/api/professional-identity/me');
       setIdentity(me.identity);
-      setIdentityMsg('✅ Identidade profissional salva.');
+      setIdentityMsg('Identidade profissional salva.');
     } catch (err) { setIdentityError(err); }
     finally { setIdentitySaving(false); }
   };
@@ -124,7 +124,7 @@ export default function Profile() {
     try {
       await apiPost('/api/auth/change-password', { currentPassword: pw.current, newPassword: pw.next });
       setPw({ current: '', next: '', confirm: '' });
-      setPwMsg('✅ Senha alterada com sucesso.');
+      setPwMsg('Senha alterada com sucesso.');
     } catch (err) { setPwError(err); }
     finally { setPwSaving(false); }
   };

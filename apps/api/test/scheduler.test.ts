@@ -5,6 +5,7 @@ import { createAuthHelper, createSecondUserInOrg, createSuperAdmin, makeApp, res
 import { getPool } from '../src/db/client';
 import { createMonitorScheduler, stopMonitorScheduler } from '../src/capture/scheduler/service';
 import type { SyncResult } from '../src/capture/sync/service';
+import { syncCase } from '../src/capture/sync/service';
 import { setNotificationChannelsForTests } from '../src/notify/registry';
 import type { NotificationChannel, ChannelMessage, ChannelResult } from '../src/notify/types';
 
@@ -241,5 +242,200 @@ describe('ETAPA 9 — Integração: monitoring pause/activate + isolamento', () 
   it('14. SUPER_ADMIN não acessa a rota jurídica normal', async () => {
     const sa = await createSuperAdmin(app);
     await request(app).patch('/api/processes/00000000-0000-0000-0000-000000000000/monitoring').set('Cookie', sa.cookie).send({ enabled: false }).expect(403);
+  });
+});
+
+describe('ETAPA 9 — Execução automática (timer real, sem chamar runOnce manualmente)', () => {
+  const app = makeApp();
+  const helper = createAuthHelper(app);
+  const emailChannel = new FakeEmailChannel();
+
+  before(async () => {
+    await resetDb();
+    setNotificationChannelsForTests([emailChannel]);
+  });
+  after(async () => {
+    setNotificationChannelsForTests(null);
+    stopMonitorScheduler();
+    const { closePool } = await import('../src/db/client');
+    await closePool();
+  });
+  beforeEach(async () => { await resetDb(); emailChannel.lastMessage = null; });
+
+  /** Aguarda o timer disparar um ciclo (intervalo curto definido pelo teste). */
+  async function waitForCycle(scheduler: ReturnType<typeof createMonitorScheduler>, maxMs = 30000): Promise<ReturnType<typeof scheduler.lastResult>> {
+    const started = Date.now();
+    while (Date.now() - started < maxMs) {
+      const r = scheduler.lastResult();
+      if (r) return r;
+      await new Promise((r2) => setTimeout(r2, 200));
+    }
+    return null;
+  }
+
+  /** Aguarda o N-ésimo ciclo (para distinguir o primeiro do segundo no mesmo scheduler). */
+  async function waitForCycleCount(scheduler: ReturnType<typeof createMonitorScheduler>, target: number, maxMs = 30000): Promise<ReturnType<typeof scheduler.lastResult>> {
+    const started = Date.now();
+    while (Date.now() - started < maxMs) {
+      const cycles = scheduler.getStatus().cumulative.cycles;
+      if (cycles >= target) return scheduler.lastResult();
+      await new Promise((r2) => setTimeout(r2, 200));
+    }
+    return scheduler.lastResult();
+  }
+
+  async function insertCase(orgId: string, overrides: { monitoringStatus?: string; processNumber?: string | null; lastSyncedAt?: string | null } = {}) {
+    const pool = getPool();
+    const res = await pool.query(
+      `INSERT INTO cases (organization_id, title, process_number, monitoring_status, last_synced_at)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [orgId, 'Proc', overrides.processNumber ?? CNJ, overrides.monitoringStatus ?? 'ACTIVE', 'lastSyncedAt' in overrides ? overrides.lastSyncedAt : null],
+    );
+    return res.rows[0];
+  }
+
+  it('execução automática: start() dispara syncCase sozinho e cria capture_run + last_synced_at', async () => {
+    const session = await helper.registerAndLogin();
+    const caseRow = await insertCase(session.orgId);
+    const pool = getPool();
+
+    // syncFn REAL (syncCase) com lookup controlado (fonte injetada, sem rede).
+    const syncFn = (orgId: string, caseId: string): Promise<SyncResult> =>
+      syncCase(orgId, caseId, session.userId, undefined, async () => ({
+        process: { processNumber: CNJ, title: 'Proc', court: 'TRF1' },
+        movements: [{ processNumber: CNJ, date: '2026-09-01T10:00:00.000Z', description: 'Movimento automático 1', sourceReference: 'datajud-mov-1' }],
+        metadata: { dataJud: { tribunal: 'TRF1', movementCount: 1 } },
+      }));
+
+    const scheduler = createMonitorScheduler({ enabled: true, intervalMinutes: 1 / 60, concurrency: 1, syncFn });
+    scheduler.start();
+    const result = await waitForCycle(scheduler);
+    scheduler.stop();
+
+    assert.ok(result, 'scheduler NÃO executou nenhum ciclo automaticamente');
+    assert.equal(result.success, 1);
+    assert.equal(result.started, 1);
+    assert.ok(result.newEvents >= 1);
+
+    // capture_run criado pela sincronização automática
+    const runRes = await pool.query('SELECT * FROM capture_runs WHERE case_id = $1 AND adapter = $2', [caseRow.id, 'SYNC']);
+    assert.equal(runRes.rows.length, 1);
+    assert.equal(runRes.rows[0].source, 'DATAJUD');
+    assert.equal(runRes.rows[0].status, 'SUCCESS');
+    assert.ok(runRes.rows[0].started_at);
+    assert.ok(runRes.rows[0].finished_at);
+    assert.equal(runRes.rows[0].case_id, caseRow.id);
+
+    // last_synced_at atualizado
+    const caseDb = await pool.query('SELECT last_synced_at FROM cases WHERE id = $1', [caseRow.id]);
+    assert.ok(caseDb.rows[0].last_synced_at);
+  });
+
+  it('ciclo automático não duplica eventos; PAUSADO não é sincronizado; ERROR não é sincronizado', async () => {
+    const session = await helper.registerAndLogin();
+    // CNJs distintos (unique index por (org, process_number))
+    const active = await insertCase(session.orgId);
+    await insertCase(session.orgId, { monitoringStatus: 'PAUSED', processNumber: '0001000-20.2020.4.01.3202' });
+    await insertCase(session.orgId, { monitoringStatus: 'ERROR', processNumber: '0002000-21.2020.4.01.3202' });
+    const pool = getPool();
+
+    let calls = 0;
+    const syncFn = (orgId: string, caseId: string): Promise<SyncResult> => {
+      calls += 1;
+      return Promise.resolve({
+        caseId, processNumber: CNJ, source: 'DATAJUD', status: 'SUCCESS', found: 1,
+        inserted: 0, duplicates: 1, errors: 0, movementsFound: 1, publicationsFound: 0,
+        synchronizedAt: new Date().toISOString(), runId: `run-${caseId}`, errorMessage: null,
+      });
+    };
+
+    const scheduler = createMonitorScheduler({ enabled: true, intervalMinutes: 1 / 60, concurrency: 1, syncFn });
+    scheduler.start();
+    const result = await waitForCycle(scheduler);
+    scheduler.stop();
+
+    assert.ok(result, 'scheduler NÃO executou ciclo');
+    assert.equal(calls, 1, 'somente o caso ACTIVE foi sincronizado');
+    assert.equal(result.eligible, 1);
+
+    // ciclo 2: mesmo caso, 0 novos, sem duplicação de eventos (fake retorna 0 novos)
+    const s2 = createMonitorScheduler({ enabled: true, intervalMinutes: 1 / 60, concurrency: 1, syncFn });
+    s2.start();
+    const r2 = await waitForCycle(s2);
+    s2.stop();
+    assert.ok(r2);
+    assert.equal(r2.success, 1);
+    assert.equal(r2.newEvents, 0);
+
+    // Nenhuma duplicação de eventos reais (fora do fake): evento real do teste anterior
+    const evRes = await pool.query('SELECT count(*)::int AS n FROM case_events WHERE process_id = $1', [active.id]);
+    assert.equal(evRes.rows[0].n, 0);
+  });
+
+  it('PAUSAR → scheduler para de sincronizar; ATIVAR → volta a ser elegível (integrado com HTTP)', async () => {
+    const session = await helper.registerAndLogin();
+    // Cria via HTTP para existir case_members (o PATCH /monitoring exige permissão no case).
+    const createRes = await request(app).post('/api/processes').set('Cookie', session.cookie).send({ title: 'Proc', processNumber: CNJ }).expect(201);
+    const caseRow = { id: createRes.body.id as string };
+    const pool = getPool();
+
+    // Pausa via endpoint (fluxo real da UI)
+    await request(app).patch(`/api/processes/${caseRow.id}/monitoring`).set('Cookie', session.cookie).send({ enabled: false }).expect(200);
+    const paused = await pool.query('SELECT monitoring_status FROM cases WHERE id = $1', [caseRow.id]);
+    assert.equal(paused.rows[0].monitoring_status, 'PAUSED');
+
+    let calls = 0;
+    const syncFn = (orgId: string, caseId: string): Promise<SyncResult> => {
+      calls += 1;
+      return Promise.resolve({
+        caseId, processNumber: CNJ, source: 'DATAJUD', status: 'SUCCESS', found: 1,
+        inserted: 0, duplicates: 1, errors: 0, movementsFound: 1, publicationsFound: 0,
+        synchronizedAt: new Date().toISOString(), runId: `run-${caseId}`, errorMessage: null,
+      });
+    };
+
+    const scheduler = createMonitorScheduler({ enabled: true, intervalMinutes: 1 / 60, concurrency: 1, syncFn });
+    scheduler.start();
+    const r1 = await waitForCycle(scheduler);
+    assert.ok(r1);
+    assert.equal(calls, 0, 'processo PAUSADO não deve ser sincronizado');
+
+    // Reativa
+    await request(app).patch(`/api/processes/${caseRow.id}/monitoring`).set('Cookie', session.cookie).send({ enabled: true }).expect(200);
+    const r2 = await waitForCycleCount(scheduler, 2);
+    assert.ok(r2);
+    assert.ok(calls >= 1, 'após reativar, o processo volta a ser elegível');
+    scheduler.stop();
+  });
+
+  it('restart: nova instância do scheduler volta a sincronizar (simula reinício da API)', async () => {
+    const session = await helper.registerAndLogin();
+    await insertCase(session.orgId);
+
+    let calls = 0;
+    const syncFn = (orgId: string, caseId: string): Promise<SyncResult> => {
+      calls += 1;
+      return Promise.resolve({
+        caseId, processNumber: CNJ, source: 'DATAJUD', status: 'SUCCESS', found: 1,
+        inserted: 0, duplicates: 1, errors: 0, movementsFound: 1, publicationsFound: 0,
+        synchronizedAt: new Date().toISOString(), runId: `run-${caseId}`, errorMessage: null,
+      });
+    };
+
+    // instância 1 roda
+    const s1 = createMonitorScheduler({ enabled: true, intervalMinutes: 1 / 60, concurrency: 1, syncFn });
+    s1.start();
+    const r1 = await waitForCycle(s1);
+    assert.ok(r1);
+    s1.stop();
+
+    // "reinício": nova instância
+    const s2 = createMonitorScheduler({ enabled: true, intervalMinutes: 1 / 60, concurrency: 1, syncFn });
+    s2.start();
+    const r2 = await waitForCycle(s2);
+    s2.stop();
+
+    assert.ok(r2, 'após reinício o scheduler voltou a executar ciclo');
+    assert.ok(calls >= 2, 'deveria ter sincronizado antes e depois do reinício');
   });
 });

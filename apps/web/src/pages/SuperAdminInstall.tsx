@@ -70,16 +70,16 @@ function stepLabel(key: string, clientType: 'solo' | 'escritorio' | null): strin
   return BASE_STEPS.find((d) => d.key === key)?.label ?? key;
 }
 
-function statusIcon(s: StepState | undefined): { icon: string; color: string } {
-  if (!s || s.status === 'NOT_STARTED') return { icon: '⚪', color: 'text-gray-400' };
-  if (s.status === 'OK') return { icon: '🟢', color: 'text-green-600' };
-  if (s.status === 'FAILED') return { icon: '🔴', color: 'text-red-600' };
-  return { icon: '🟡', color: 'text-yellow-500' };
+function statusIcon(s: StepState | undefined): { dot: string; color: string } {
+  if (!s || s.status === 'NOT_STARTED') return { dot: 'bg-gray-300', color: 'text-gray-400' };
+  if (s.status === 'OK') return { dot: 'bg-success-600', color: 'text-green-600' };
+  if (s.status === 'FAILED') return { dot: 'bg-danger-600', color: 'text-red-600' };
+  return { dot: 'bg-warning-500', color: 'text-yellow-500' };
 }
 
-function StepBadge({ s }: { s: StepState | undefined }) {
-  const { icon } = statusIcon(s);
-  return <span>{icon}</span>;
+function StepDot({ s }: { s: StepState | undefined }) {
+  const { dot } = statusIcon(s);
+  return <span className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${dot}`} />;
 }
 
 const initialOrg = { orgName: '', orgTradeName: '', orgCnpj: '', orgAddress: '', orgPhone: '', orgEmail: '' };
@@ -138,9 +138,9 @@ export default function SuperAdminInstall() {
       setInst(res.installation);
       const stepStatus = res.installation?.steps?.[path]?.status;
       const label = stepLabel(path, res.installation?.clientType ?? null);
-      if (stepStatus === 'OK') setMsg(`✅ ${label} validado.`);
-      else if (stepStatus === 'FAILED') setMsg(`❌ Falha: ${res.installation?.steps?.[path]?.message ?? 'erro desconhecido'}`);
-      else setMsg(`ℹ️ ${label} salvo (status: ${stepStatus ?? 'pendente'}).`);
+      if (stepStatus === 'OK') setMsg(`${label} validado.`);
+      else if (stepStatus === 'FAILED') setMsg(`Falha: ${res.installation?.steps?.[path]?.message ?? 'erro desconhecido'}`);
+      else setMsg(`${label} salvo (status: ${stepStatus ?? 'pendente'}).`);
     }     catch (e) { setError(e); }
     finally { setBusy(false); setTestingStep(null); }
   };
@@ -162,8 +162,8 @@ export default function SuperAdminInstall() {
       setInst(adminRes.installation);
       const orgStatus = adminRes.installation?.steps?.organization?.status;
       const admStatus = adminRes.installation?.steps?.administrator?.status;
-      if (orgStatus === 'OK' && admStatus === 'OK') setMsg('✅ Dados iniciais validados (ADMIN + LAWYER).');
-      else setMsg(`ℹ️ Dados iniciais salvos (${orgStatus ?? 'pendente'} / ${admStatus ?? 'pendente'}).`);
+      if (orgStatus === 'OK' && admStatus === 'OK') setMsg('Dados iniciais validados (ADMIN + LAWYER).');
+      else setMsg(`Dados iniciais salvos (${orgStatus ?? 'pendente'} / ${admStatus ?? 'pendente'}).`);
     } catch (e) { setError(e); }
     finally { setBusy(false); setTestingStep(null); }
   };
@@ -173,7 +173,7 @@ export default function SuperAdminInstall() {
     try {
       const res = await apiPost<{ installation: Installation }>('/api/superadmin/installation/finalize');
       setInst(res.installation);
-      setMsg('✅ Implantação pronta para entrega.');
+      setMsg('Implantação pronta para entrega.');
     } catch (e) { setError(e); }
     finally { setBusy(false); }
   };
@@ -264,14 +264,14 @@ export default function SuperAdminInstall() {
               {stepDefs.map((d, i) => {
                 const st = getStepState(d.key, inst.steps);
                 const active = i === step;
-                const { icon } = statusIcon(st);
+                const { dot } = statusIcon(st);
                 return (
                   <button
                     key={d.key}
                     onClick={() => setStep(i)}
                     className={`flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm ${active ? 'bg-brand-50 font-semibold text-brand-800' : 'text-gray-600 hover:bg-gray-50'}`}
                   >
-                    <span className="text-sm">{icon}</span>
+                    <span className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${dot}`} />
                     <span className="truncate">{d.label}</span>
                   </button>
                 );
@@ -405,10 +405,10 @@ export default function SuperAdminInstall() {
                   <p className="text-sm text-gray-600">Executa verificações reais de banco, migrations, storage e ambiente.</p>
                   <div className="rounded-lg border border-gray-200 p-3 text-sm">
                     <ul className="space-y-1.5">
-                      <li className="flex items-center gap-2">🟢 API funcionando</li>
-                      <li className="flex items-center gap-2">🟢 Banco funcionando</li>
-                      <li className="flex items-center gap-2">🟢 Storage disponível</li>
-                      <li className="flex items-center gap-2">🟢 Migrations aplicadas</li>
+                      <li className="flex items-center gap-2"><span className="inline-block h-2 w-2 rounded-full bg-success-600" />API funcionando</li>
+                      <li className="flex items-center gap-2"><span className="inline-block h-2 w-2 rounded-full bg-success-600" />Banco funcionando</li>
+                      <li className="flex items-center gap-2"><span className="inline-block h-2 w-2 rounded-full bg-success-600" />Storage disponível</li>
+                      <li className="flex items-center gap-2"><span className="inline-block h-2 w-2 rounded-full bg-success-600" />Migrations aplicadas</li>
                     </ul>
                   </div>
                   <Button onClick={() => void runStep('infrastructure')} disabled={busy}>{busy ? 'Testando…' : 'Executar verificação'}</Button>
@@ -460,11 +460,11 @@ export default function SuperAdminInstall() {
                   <div className="rounded-lg border border-gray-200 p-3 text-sm">
                     <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Fontes</div>
                     <ul className="space-y-1.5">
-                      <li className="flex items-center gap-2">🟢 Demonstração — <span className="text-brand-700">validada localmente</span></li>
-                      <li className="flex items-center gap-2">⚪ DataJud — fonte pública, não implementada nesta versão</li>
-                      <li className="flex items-center gap-2">⚪ PJe — não implementado nesta versão</li>
-                      <li className="flex items-center gap-2">⚪ e-SAJ — não implementado nesta versão</li>
-                      <li className="flex items-center gap-2">⚪ Projudi — não implementado nesta versão</li>
+                      <li className="flex items-center gap-2"><span className="inline-block h-2 w-2 rounded-full bg-success-600" />Demonstração — <span className="text-brand-700">validada localmente</span></li>
+                      <li className="flex items-center gap-2"><span className="inline-block h-2 w-2 rounded-full bg-gray-300" />DataJud — fonte pública, não implementada nesta versão</li>
+                      <li className="flex items-center gap-2"><span className="inline-block h-2 w-2 rounded-full bg-gray-300" />PJe — não implementado nesta versão</li>
+                      <li className="flex items-center gap-2"><span className="inline-block h-2 w-2 rounded-full bg-gray-300" />e-SAJ — não implementado nesta versão</li>
+                      <li className="flex items-center gap-2"><span className="inline-block h-2 w-2 rounded-full bg-gray-300" />Projudi — não implementado nesta versão</li>
                     </ul>
                   </div>
                   <div className="rounded-lg border border-info-100 bg-info-50 px-4 py-3 text-xs leading-relaxed text-info-700">
@@ -477,7 +477,7 @@ export default function SuperAdminInstall() {
               {current === 'notifications' && (
                 <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); void runStep('notifications', notif); }}>
                   <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-                    Canal de comunicação: <b>E-mail</b> — {inst.steps.email?.status === 'OK' ? '🟢 configurado e testado' : '🟡 não validado'}
+                    Canal de comunicação: <b>E-mail</b> — {inst.steps.email?.status === 'OK' ? 'configurado e testado' : 'não validado'}
                   </div>
                   {([['emailEnabled', 'E-mail habilitado'], ['newPublication', 'Nova intimação'], ['deadlineAlert', 'Alerta de prazo'], ['paymentAlert', 'Cobrança']] as const).map(([k, label]) => (
                     <label key={k} className="flex items-center justify-between text-sm">
@@ -494,12 +494,12 @@ export default function SuperAdminInstall() {
                   <p className="text-sm text-gray-600">Executa verificações de segurança: autenticação, sessões, senhas, isolamento, permissões, scope e auditoria.</p>
                   <div className="rounded-lg border border-gray-200 p-3 text-sm">
                     <ul className="space-y-1.5">
-                      <li className="flex items-center gap-2">🟢 Autenticação</li>
-                      <li className="flex items-center gap-2">🟢 Sessões</li>
-                      <li className="flex items-center gap-2">🟢 Senhas (hash)</li>
-                      <li className="flex items-center gap-2">🟢 Isolamento</li>
-                      <li className="flex items-center gap-2">🟢 Permissões</li>
-                      <li className="flex items-center gap-2">🟢 Auditoria</li>
+                      <li className="flex items-center gap-2"><span className="inline-block h-2 w-2 rounded-full bg-success-600" />Autenticação</li>
+                      <li className="flex items-center gap-2"><span className="inline-block h-2 w-2 rounded-full bg-success-600" />Sessões</li>
+                      <li className="flex items-center gap-2"><span className="inline-block h-2 w-2 rounded-full bg-success-600" />Senhas (hash)</li>
+                      <li className="flex items-center gap-2"><span className="inline-block h-2 w-2 rounded-full bg-success-600" />Isolamento</li>
+                      <li className="flex items-center gap-2"><span className="inline-block h-2 w-2 rounded-full bg-success-600" />Permissões</li>
+                      <li className="flex items-center gap-2"><span className="inline-block h-2 w-2 rounded-full bg-success-600" />Auditoria</li>
                     </ul>
                   </div>
                   <Button onClick={() => void runStep('security')} disabled={busy}>{busy ? 'Executando…' : 'Executar verificação'}</Button>
@@ -519,7 +519,7 @@ export default function SuperAdminInstall() {
                 <div className="space-y-4">
                   <ErrorAlert error={error} />
                   <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-800">
-                    {inst.ready ? '🟢 INSTALAÇÃO VALIDADA' : 'Em andamento…'}
+                    {inst.ready ? 'INSTALAÇÃO VALIDADA' : 'Em andamento…'}
                   </div>
                   <dl className="space-y-2 text-sm">
                     <div className="flex justify-between"><span className="text-gray-500">Instalação</span><b>{String(inst.data.orgName ?? '—')}</b></div>
@@ -529,36 +529,36 @@ export default function SuperAdminInstall() {
                   <div className="rounded-lg border border-gray-200 p-3">
                     <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Infraestrutura</div>
                     <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-                      <li className="flex items-center gap-2 text-sm">API <StepBadge s={inst.steps.infrastructure} /></li>
-                      <li className="flex items-center gap-2 text-sm">Banco <StepBadge s={inst.steps.infrastructure} /></li>
-                      <li className="flex items-center gap-2 text-sm">Storage <StepBadge s={inst.steps.storage} /></li>
+                      <li className="flex items-center gap-2 text-sm">API <StepDot s={inst.steps.infrastructure} /></li>
+                      <li className="flex items-center gap-2 text-sm">Banco <StepDot s={inst.steps.infrastructure} /></li>
+                      <li className="flex items-center gap-2 text-sm">Storage <StepDot s={inst.steps.storage} /></li>
                     </ul>
                   </div>
                   <div className="rounded-lg border border-gray-200 p-3">
                     <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Comunicação</div>
                     <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-                      <li className="flex items-center gap-2 text-sm">E-mail <StepBadge s={inst.steps.email} /> {inst.steps.email?.status === 'OK' ? 'configurado e testado' : ''}</li>
+                      <li className="flex items-center gap-2 text-sm">E-mail <StepDot s={inst.steps.email} /> {inst.steps.email?.status === 'OK' ? 'configurado e testado' : ''}</li>
                     </ul>
                   </div>
                   <div className="rounded-lg border border-gray-200 p-3">
                     <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Inteligência Artificial</div>
                     <ul className="space-y-1 text-sm">
-                      <li className="flex items-center gap-2">IA <StepBadge s={inst.steps.ai} /> {inst.steps.ai?.status === 'OK' ? 'configurada e testada' : ''}</li>
+                      <li className="flex items-center gap-2">IA <StepDot s={inst.steps.ai} /> {inst.steps.ai?.status === 'OK' ? 'configurada e testada' : ''}</li>
                       <li className="text-xs text-gray-500">Provider: {String((inst.data.ai as Record<string, unknown> | undefined)?.provider ?? '—')} · Modelo: {String((inst.data.ai as Record<string, unknown> | undefined)?.model ?? '—')}</li>
                     </ul>
                   </div>
                   <div className="rounded-lg border border-gray-200 p-3">
                     <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Captura</div>
                     <ul className="space-y-1 text-sm">
-                      <li className="flex items-center gap-2">Demonstração <StepBadge s={inst.steps.capture} /> {inst.steps.capture?.status === 'OK' ? 'validada (dados fictícios)' : ''}</li>
+                      <li className="flex items-center gap-2">Demonstração <StepDot s={inst.steps.capture} /> {inst.steps.capture?.status === 'OK' ? 'validada (dados fictícios)' : ''}</li>
                       <li className="text-xs text-gray-500">DataJud, PJe, e-SAJ e Projudi não implementados nesta versão.</li>
                     </ul>
                   </div>
                   <div className="rounded-lg border border-gray-200 p-3">
                     <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Segurança e teste funcional</div>
                     <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-                      <li className="flex items-center gap-2 text-sm">Segurança <StepBadge s={inst.steps.security} /> {inst.steps.security?.status === 'OK' ? 'validada' : ''}</li>
-                      <li className="flex items-center gap-2 text-sm">Teste funcional <StepBadge s={inst.steps.functional} /> {inst.steps.functional?.status === 'OK' ? 'aprovado' : ''}</li>
+                      <li className="flex items-center gap-2 text-sm">Segurança <StepDot s={inst.steps.security} /> {inst.steps.security?.status === 'OK' ? 'validada' : ''}</li>
+                      <li className="flex items-center gap-2 text-sm">Teste funcional <StepDot s={inst.steps.functional} /> {inst.steps.functional?.status === 'OK' ? 'aprovado' : ''}</li>
                     </ul>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -566,7 +566,7 @@ export default function SuperAdminInstall() {
                   </div>
                   {inst.ready && (
                     <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-4">
-                      <div className="text-sm font-semibold text-green-800">🟢 PRONTO PARA ENTREGA</div>
+                      <div className="text-sm font-semibold text-green-800">PRONTO PARA ENTREGA</div>
                       <label className="mt-3 flex items-center gap-2 text-sm">
                         <input type="checkbox" checked={includePassword} onChange={(e) => setIncludePassword(e.target.checked)} />
                         Incluir credencial temporária no relatório
@@ -584,9 +584,9 @@ export default function SuperAdminInstall() {
                 <SecondaryButton onClick={() => setStep(Math.max(0, step - 1))} disabled={step === 0}>← Voltar</SecondaryButton>
                 <div className="flex items-center gap-2">
                   {getStepState(current, inst.steps)?.status === 'OK' && (
-                    <span className="text-xs text-green-700">🟢 Concluído</span>
+                    <span className="text-xs text-green-700">Concluído</span>
                   )}
-                  {testingStep === current && <span className="text-xs text-yellow-600">🔄 Testando…</span>}
+                  {testingStep === current && <span className="text-xs text-yellow-600">Testando…</span>}
                   <Button onClick={() => setStep(Math.min(stepKeys.length - 1, step + 1))} disabled={step >= stepKeys.length - 1}>Avançar →</Button>
                 </div>
               </div>

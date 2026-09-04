@@ -99,7 +99,7 @@ export default function SuperAdmin() {
                     <div className="font-display text-base font-semibold text-gray-900">{inst.name}</div>
                     <div className="mt-1 text-sm text-gray-500">Plano: <b className="text-gray-700">{inst.plan}</b></div>
                     <div className="mt-0.5 text-sm text-gray-500">
-                      Status: {inst.ready ? <span className="font-semibold text-green-700">🟢 Operacional</span> : <span className="font-semibold text-yellow-700">🟡 Em implantação</span>}
+                      Status: {inst.ready ? <span className="font-semibold text-green-700">Operacional</span> : <span className="font-semibold text-yellow-700">Em implantação</span>}
                     </div>
                     <div className="mt-0.5 text-sm text-gray-500">Última validação: {formatDateTime(inst.lastValidationAt ?? inst.createdAt)}</div>
                   </div>
@@ -118,20 +118,20 @@ export default function SuperAdmin() {
               <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
                 <div><dt className="text-xs text-gray-500">Versão</dt><dd className="font-medium">{status.version}</dd></div>
                 <div><dt className="text-xs text-gray-500">Ambiente</dt><dd className="font-medium">{status.environment}</dd></div>
-                <div><dt className="text-xs text-gray-500">Banco</dt><dd className="font-medium">{status.database ? '🟢 conectado' : '🔴 indisponível'}</dd></div>
-                <div><dt className="text-xs text-gray-500">Storage</dt><dd className="font-medium">{status.storage.driver} {status.storage.ok ? '🟢' : '🔴'}</dd></div>
+                <div><dt className="text-xs text-gray-500">Banco</dt><dd className="font-medium">{status.database ? 'conectado' : 'indisponível'}</dd></div>
+                <div><dt className="text-xs text-gray-500">Storage</dt><dd className="font-medium">{status.storage.driver} {status.storage.ok ? '(ok)' : '(falha)'}</dd></div>
                 <div><dt className="text-xs text-gray-500">Migrations</dt><dd className="font-medium">{status.migrations} aplicadas</dd></div>
-                <div><dt className="text-xs text-gray-500">IA</dt><dd className="font-medium">{status.ai.provider}{status.ai.configured ? ' 🟢' : ' (não configurado)'}</dd></div>
+                <div><dt className="text-xs text-gray-500">IA</dt><dd className="font-medium">{status.ai.provider}{status.ai.configured ? ' (configurado)' : ' (não configurado)'}</dd></div>
                 <div><dt className="text-xs text-gray-500">Organizações</dt><dd className="font-medium">{status.counts.organizations}</dd></div>
                 <div><dt className="text-xs text-gray-500">Usuários</dt><dd className="font-medium">{status.counts.users}</dd></div>
               </dl>
               <div className="mt-4 rounded-lg border border-gray-200 p-3">
                 <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Status dos serviços</div>
                 <div className="flex flex-wrap gap-2">
-                  <Badge color={status.services.api ? 'green' : 'red'}>API {status.services.api ? '🟢' : '🔴'}</Badge>
-                  <Badge color={status.services.database ? 'green' : 'red'}>Banco {status.services.database ? '🟢' : '🔴'}</Badge>
-                  <Badge color={status.services.storage ? 'green' : 'red'}>Storage {status.services.storage ? '🟢' : '🔴'}</Badge>
-                  <Badge color={status.services.migrations ? 'green' : 'red'}>Migrations {status.services.migrations ? '🟢' : '🔴'}</Badge>
+                  <Badge color={status.services.api ? 'green' : 'red'}>API {status.services.api ? 'OK' : 'FALHA'}</Badge>
+                  <Badge color={status.services.database ? 'green' : 'red'}>Banco {status.services.database ? 'OK' : 'FALHA'}</Badge>
+                  <Badge color={status.services.storage ? 'green' : 'red'}>Storage {status.services.storage ? 'OK' : 'FALHA'}</Badge>
+                  <Badge color={status.services.migrations ? 'green' : 'red'}>Migrations {status.services.migrations ? 'OK' : 'FALHA'}</Badge>
                 </div>
               </div>
             </>

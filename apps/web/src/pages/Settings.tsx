@@ -210,26 +210,25 @@ export default function Settings() {
             <ErrorAlert error={captureError} />
             <div className="space-y-4">
               {captureConfigs.map((c) => {
-                const statusIcon = c.implemented ? (c.configured ? '🟢' : '🟡') : '⚪';
                 const statusText = c.implemented ? (c.configured ? 'Configurado' : 'Não configurado') : 'Não implementado';
                 const result = runResults[c.source];
                 const test = testResults[c.source];
                 const running = runningSource === c.source;
                 const testing = testingSource === c.source;
                 const modeBadge = c.mode === 'DEMO'
-                  ? { icon: '🟣', label: 'DEMONSTRAÇÃO', sub: 'Dados fictícios', cls: 'border-purple-200 bg-purple-50 text-purple-700' }
+                  ? { label: 'DEMONSTRAÇÃO', sub: 'Dados fictícios', cls: 'border-purple-200 bg-purple-50 text-purple-700' }
                   : c.mode === 'PUBLIC'
-                    ? { icon: '🟢', label: 'PÚBLICO', sub: 'Fonte pública', cls: 'border-green-200 bg-green-50 text-green-700' }
-                    : { icon: '🔵', label: 'PRODUÇÃO', sub: 'Fonte autenticada', cls: 'border-blue-200 bg-blue-50 text-blue-700' };
+                    ? { label: 'PÚBLICO', sub: 'Fonte pública', cls: 'border-green-200 bg-green-50 text-green-700' }
+                    : { label: 'PRODUÇÃO', sub: 'Fonte autenticada', cls: 'border-blue-200 bg-blue-50 text-blue-700' };
                 return (
                   <div key={c.source} className="rounded border border-gray-200 p-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="text-sm font-semibold text-gray-900">{c.source}</div>
                       <div className="flex items-center gap-2">
                         <span className={`rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${modeBadge.cls}`} title={modeBadge.sub}>
-                          {modeBadge.icon} {modeBadge.label}
+                          {modeBadge.label}
                         </span>
-                        <Badge color={c.implemented ? (c.configured ? 'green' : 'yellow') : 'gray'}>{statusIcon} {statusText}</Badge>
+                        <Badge color={c.implemented ? (c.configured ? 'green' : 'yellow') : 'gray'}>{statusText}</Badge>
                       </div>
                     </div>
                     <div className="mt-1 text-xs text-gray-500">{modeBadge.sub}</div>
@@ -264,7 +263,7 @@ export default function Settings() {
 
                     {test && (
                       <div className={`mt-2.5 rounded-md border px-3 py-2 text-xs leading-relaxed ${test.ok ? 'border-green-200 bg-green-50 text-green-800' : 'border-red-200 bg-red-50 text-red-700'}`}>
-                        <b>{test.ok ? '✓ Conexão ok' : '✗ Falha na conexão'}</b> — {test.message}
+                        <b>{test.ok ? 'Conexão ok' : 'Falha na conexão'}</b> — {test.message}
                         {test.details && test.details.length > 0 && (
                           <ul className="mt-1 list-inside list-disc space-y-0.5">
                             {test.details.map((d) => <li key={d}>{d}</li>)}
@@ -289,7 +288,7 @@ export default function Settings() {
                           <ul className="mt-2 space-y-1">
                             {result.steps.map((s) => (
                               <li key={s.name} className="flex items-start gap-2 text-xs">
-                                <span>{s.status === 'OK' ? '🟢' : '🔴'}</span>
+                                <span className={`mt-1 inline-block h-2 w-2 shrink-0 rounded-full ${s.status === 'OK' ? 'bg-success-600' : 'bg-danger-600'}`} />
                                 <span>
                                   <b>{s.name}</b>
                                   {s.message && <span className="text-gray-500"> — {s.message}</span>}

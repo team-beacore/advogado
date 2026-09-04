@@ -80,10 +80,10 @@ export default function Monitoring() {
                 <dd>
                   {s?.enabled ? (
                     s?.running
-                      ? <Badge color="green">🟢 Operacional</Badge>
-                      : <Badge color="yellow">🟡 Aguardando ciclo</Badge>
+                      ? <Badge color="green">Operacional</Badge>
+                      : <Badge color="yellow">Aguardando ciclo</Badge>
                   ) : (
-                    <Badge color="gray">⚪ Desabilitado</Badge>
+                    <Badge color="gray">Desabilitado</Badge>
                   )}
                 </dd>
               </div>
@@ -128,10 +128,10 @@ export default function Monitoring() {
           {/* Organização */}
           <Card title="Processos">
             <dl className="space-y-2.5 text-sm">
-              <div className="flex justify-between"><dt className="text-gray-500">🟢 Monitoramento ativo</dt><dd className="font-medium text-gray-900">{org?.active ?? 0}</dd></div>
-              <div className="flex justify-between"><dt className="text-gray-500">⏸ Monitoramento pausado</dt><dd className="font-medium text-gray-900">{org?.paused ?? 0}</dd></div>
-              <div className="flex justify-between"><dt className="text-gray-500">🔴 Com erro</dt><dd className="font-medium text-gray-900">{org?.error ?? 0}</dd></div>
-              <div className="flex justify-between"><dt className="text-gray-500">🟡 Sincronização atrasada</dt><dd className="font-medium text-gray-900">{org?.stale ?? 0}</dd></div>
+              <div className="flex justify-between"><dt className="text-gray-500">Monitoramento ativo</dt><dd className="font-medium text-gray-900">{org?.active ?? 0}</dd></div>
+              <div className="flex justify-between"><dt className="text-gray-500">Monitoramento pausado</dt><dd className="font-medium text-gray-900">{org?.paused ?? 0}</dd></div>
+              <div className="flex justify-between"><dt className="text-gray-500">Com erro</dt><dd className="font-medium text-gray-900">{org?.error ?? 0}</dd></div>
+              <div className="flex justify-between"><dt className="text-gray-500">Sincronização atrasada</dt><dd className="font-medium text-gray-900">{org?.stale ?? 0}</dd></div>
               <div className="mt-2 border-t border-gray-100 pt-2" />
               <div className="flex justify-between"><dt className="text-gray-500">Total de sincronizações</dt><dd className="font-medium text-gray-900">{org?.totalSyncs ?? 0}</dd></div>
               <div className="flex justify-between"><dt className="text-gray-500">Eventos importados</dt><dd className="font-medium text-gray-900">{org?.totalEvents ?? 0}</dd></div>

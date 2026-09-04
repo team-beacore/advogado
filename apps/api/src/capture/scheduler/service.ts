@@ -166,14 +166,14 @@ export function createMonitorScheduler(
           }
 
           try {
-            console.log(`[monitor] sync iniciado case=${item.id}`);
+            console.log(`[monitor] sync iniciado case=${item.id} processo=${item.processNumber ?? '—'}`);
             const result = await doSync(item.organizationId, item.id, null, undefined);
             if (result.status === 'SUCCESS') counters.success += 1;
             else if (result.status === 'PARTIAL') counters.partial += 1;
             else counters.failed += 1;
             counters.newEvents += result.inserted;
             if (result.status === 'FAILED') counters.errors += 1;
-            console.log(`[monitor] sync concluído case=${item.id} status=${result.status} novos=${result.inserted}`);
+            console.log(`[monitor] sync concluído case=${item.id} processo=${item.processNumber ?? '—'} status=${result.status} novos=${result.inserted} duplicados=${result.duplicates}`);
           } catch (e) {
             counters.failed += 1;
             counters.errors += 1;

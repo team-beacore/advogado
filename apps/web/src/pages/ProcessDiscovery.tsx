@@ -66,18 +66,18 @@ function confidenceColor(confidence: number | null): string {
 }
 
 function confidenceLabel(confidence: number | null): string {
-  if (confidence == null) return '⚪ Não determinada';
-  if (confidence >= 1) return '🟢 Alta confiança';
-  if (confidence >= 0.5) return '🟡 Média confiança';
-  if (confidence >= 0.2) return '🟠 Baixa confiança';
-  return '⚪ Não determinada';
+  if (confidence == null) return 'Não determinada';
+  if (confidence >= 1) return 'Alta confiança';
+  if (confidence >= 0.5) return 'Média confiança';
+  if (confidence >= 0.2) return 'Baixa confiança';
+  return 'Não determinada';
 }
 
 function providerIcon(p: ProviderStatus): string {
-  if (!p.implemented) return '⚪';
-  if (!p.capabilities.supportsProfessionalDiscovery) return '🔵';
-  if (!p.configured) return '🟡';
-  return '🟢';
+  if (!p.implemented) return '—';
+  if (!p.capabilities.supportsProfessionalDiscovery) return '•';
+  if (!p.configured) return '•';
+  return '•';
 }
 
 function providerSub(p: ProviderStatus): string {
@@ -232,15 +232,15 @@ export default function ProcessDiscovery() {
 
             <div className="flex flex-wrap items-center gap-3">
               <Button onClick={() => void runDiscovery()} disabled={running || !canRun}>
-                {running ? 'Descobrindo processos…' : '🔎 Iniciar descoberta'}
+                {running ? 'Descobrindo processos…' : 'Iniciar descoberta'}
               </Button>
               {!canRun && <span className="text-xs text-gray-500">Você não possui permissão para executar descobertas.</span>}
             </div>
 
             {running && (
               <div className="mt-4 space-y-1.5 rounded-lg border border-info-100 bg-info-50 px-4 py-3 text-sm text-info-700">
-                <div>✓ Identidade profissional validada</div>
-                <div>⏳ Consultando fontes e processando resultados…</div>
+                <div className="flex items-center gap-2"><span className="inline-block h-2 w-2 rounded-full bg-success-600" />Identidade profissional validada</div>
+                <div className="flex items-center gap-2"><span className="inline-block h-2 w-2 animate-pulse rounded-full bg-brand-400" />Consultando fontes e processando resultados…</div>
               </div>
             )}
 
@@ -258,7 +258,7 @@ export default function ProcessDiscovery() {
                   <ul className="mt-3 space-y-1.5">
                     {runResult.steps.map((s) => (
                       <li key={s.name} className="flex items-start gap-2 text-xs">
-                        <span>{s.status === 'OK' ? '✓' : s.status === 'SKIPPED' ? '−' : '✗'}</span>
+                        <span className={`mt-1 inline-block h-2 w-2 shrink-0 rounded-full ${s.status === 'OK' ? 'bg-success-600' : s.status === 'SKIPPED' ? 'bg-gray-300' : 'bg-danger-600'}`} />
                         <span>
                           <b>{s.name}</b>
                           {s.message && <span className="text-gray-500"> — {s.message}</span>}

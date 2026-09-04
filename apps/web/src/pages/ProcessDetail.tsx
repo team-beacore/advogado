@@ -165,10 +165,10 @@ function Overview({ data, onRefresh }: { data: ProcessDetail; onRefresh: () => P
                   const monErr = data.monitoring_status === 'ERROR' || Boolean(data.last_sync_error);
                   const monStale = data.monitoring_status === 'ACTIVE' && !monErr && data.monitoring_stale === true;
                   const badgeColor = monErr ? 'red' : monStale ? 'yellow' : data.monitoring_status === 'ACTIVE' ? 'green' : data.monitoring_status === 'PAUSED' ? 'yellow' : 'gray';
-                  const badgeText = data.monitoring_status === 'ACTIVE' && !monErr && !monStale ? '🟢 Monitoramento ativo'
-                    : monStale ? '🟡 Sincronização atrasada'
-                    : monErr ? '🔴 Monitoramento com erro'
-                    : data.monitoring_status === 'PAUSED' ? '⏸ Monitoramento pausado'
+                  const badgeText = data.monitoring_status === 'ACTIVE' && !monErr && !monStale ? 'Monitoramento ativo'
+                    : monStale ? 'Sincronização atrasada'
+                    : monErr ? 'Monitoramento com erro'
+                    : data.monitoring_status === 'PAUSED' ? 'Monitoramento pausado'
                     : '—';
                   return <Badge color={badgeColor}>{badgeText}</Badge>;
                 })()}
@@ -183,14 +183,14 @@ function Overview({ data, onRefresh }: { data: ProcessDetail; onRefresh: () => P
                 disabled={monitoringBusy || data.monitoring_status === 'PAUSED' || data.monitoring_status === 'ERROR'}
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-40"
               >
-                {monitoringBusy ? '…' : '⏸ Pausar monitoramento'}
+                {monitoringBusy ? '…' : 'Pausar monitoramento'}
               </button>
               <button
                 onClick={() => toggleMonitoring(true)}
                 disabled={monitoringBusy || data.monitoring_status === 'ACTIVE'}
                 className="mt-1.5 w-full rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-40"
               >
-                {monitoringBusy ? '…' : '▶ Ativar monitoramento'}
+                {monitoringBusy ? '…' : 'Ativar monitoramento'}
               </button>
             </div>
           </dl>
@@ -680,7 +680,17 @@ function AiTab({ processId, onRefresh }: { processId: string; onRefresh: () => P
                       onClick={() => toggle(i.id)}
                     >
                       <div className="flex min-w-0 items-center gap-2">
-                        <span className={`text-xs text-gray-400 transition-transform ${isOpen ? 'rotate-90' : ''}`}>▶</span>
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className={`h-3 w-3 text-gray-400 transition-transform ${isOpen ? 'rotate-90' : ''}`}
+                        >
+                          <path d="m9 6 6 6-6 6" />
+                        </svg>
                         <span className="truncate text-sm font-medium">{statusLabel(String(i.type))}</span>
                         {i.model && <span className="truncate text-xs text-gray-400">{i.model}</span>}
                       </div>

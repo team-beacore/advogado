@@ -150,7 +150,7 @@ export default function Team() {
                 <>
                   <div className="mt-1">Senha temporária: <b className="font-mono">{inviteMsg.temporaryPassword}</b></div>
                   <div className="mt-2 rounded bg-white/60 px-2 py-1.5 text-xs">
-                    ⚠️ Esta senha é temporária. O membro deverá alterá-la após o primeiro acesso.
+                    Esta senha é temporária. O membro deverá alterá-la após o primeiro acesso.
                   </div>
                 </>
               )}
