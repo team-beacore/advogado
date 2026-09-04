@@ -23,11 +23,20 @@ interface DashboardData {
 export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [identityMissing, setIdentityMissing] = useState(false);
+  const [identityChecked, setIdentityChecked] = useState(false);
 
   useEffect(() => {
     apiGet<DashboardData>('/api/dashboard')
       .then(setData)
       .catch((e: Error) => setError(e.message));
+  }, []);
+
+  useEffect(() => {
+    apiGet<{ identity: { id: string } | null }>('/api/professional-identity/me')
+      .then((r) => setIdentityMissing(!r.identity))
+      .catch(() => { /* identidade indisponível */ })
+      .finally(() => setIdentityChecked(true));
   }, []);
 
   if (error) return <div className="rounded-lg border border-danger-100 bg-danger-50 px-4 py-3 text-sm text-danger-700">{error}</div>;
@@ -38,10 +47,17 @@ export default function Dashboard() {
   const finance = data.finance ?? { receivableTotal: 0, receivableCount: 0, receivedTotal: 0 };
   const formatBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+  const identityBanner = identityChecked && identityMissing && (
+    <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+      <b>Configure seu perfil profissional.</b> Cadastre sua OAB/UF no <Link to="/perfil" className="font-semibold text-amber-900 underline underline-offset-2">Perfil</Link> para habilitar a Descoberta de processos.
+    </div>
+  );
+
   if (!hasData && finance.receivableCount === 0) {
     return (
       <div>
         <h1 className="page-title mb-6">Visão Geral</h1>
+        {identityBanner}
         <EmptyState title="Nenhum processo cadastrado." hint="Comece criando seu primeiro cliente e processo." />
       </div>
     );
@@ -50,6 +66,7 @@ export default function Dashboard() {
   return (
     <div>
       <h1 className="page-title mb-6">Visão Geral</h1>
+      {identityBanner}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Link to="/processos" className="group surface p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-elevated">
           <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-400">Processos ativos</div>

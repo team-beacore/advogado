@@ -201,7 +201,7 @@ describe('WIZARD DE IMPLANTAÇÃO — SOLO vs OFFICE', () => {
     const orgRes = await request(app)
       .post('/api/superadmin/installation/step/organization')
       .set('Cookie', sa.cookie)
-      .send({ orgName: clientType === 'solo' ? 'João Silva Advocacia' : 'Silva & Associados', orgUf: 'SP' })
+      .send({ orgName: clientType === 'solo' ? 'João Silva Advocacia' : 'Silva & Associados' })
       .expect(200);
     await request(app)
       .post('/api/superadmin/installation/step/administrator')
@@ -210,6 +210,45 @@ describe('WIZARD DE IMPLANTAÇÃO — SOLO vs OFFICE', () => {
       .expect(200);
     return { adminEmail, orgId: orgRes.body.installation.organizationId as string };
   }
+
+  it('wizard NÃO coleta nem persiste OAB/UF (identidade profissional é do Perfil)', async () => {
+    const sa = await createSuperAdmin(app);
+    const { adminEmail, orgId } = await runWizard(sa, 'solo');
+
+    const pool = getPool();
+    // wizard_data não contém campos de OAB/UF
+    const wizardRes = await pool.query('SELECT wizard_data FROM installation_wizard ORDER BY created_at DESC LIMIT 1');
+    const wizardData = wizardRes.rows[0].wizard_data ?? {};
+    assert.equal(Object.prototype.hasOwnProperty.call(wizardData, 'orgOab'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(wizardData, 'orgUf'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(wizardData, 'adminOab'), false);
+
+    // não existe identidade profissional global nem para o admin
+    const idCount = await pool.query('SELECT count(*)::int AS n FROM professional_identities');
+    assert.equal(idCount.rows[0].n, 0);
+
+    // settings da organização não contêm OAB global
+    const settingsRes = await pool.query('SELECT value FROM settings WHERE organization_id = $1 AND key = $2', [orgId, 'integration.notify.institution']);
+    const inst = (settingsRes.rows[0]?.value ?? {}) as Record<string, unknown>;
+    assert.equal(Object.prototype.hasOwnProperty.call(inst, 'oab'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(inst, 'uf'), false);
+
+    // admin pode configurar sua OAB/UF no Perfil (PUT /api/professional-identity/me)
+    const login = await request(app).post('/api/auth/login').send({ email: adminEmail, password: 'test1234' }).expect(200);
+    const cookie = login.headers['set-cookie']?.[0]?.split(';')[0]!;
+    const before = await request(app).get('/api/professional-identity/me').set('Cookie', cookie).expect(200);
+    assert.equal(before.body.identity, null);
+    const put = await request(app)
+      .put('/api/professional-identity/me')
+      .set('Cookie', cookie)
+      .send({ professionalName: 'João Silva', oabNumber: '123456', oabState: 'SP' })
+      .expect(201);
+    assert.ok(put.body.id);
+    const after = await request(app).get('/api/professional-identity/me').set('Cookie', cookie).expect(200);
+    assert.equal(after.body.identity.oab_number, '123456');
+    assert.equal(after.body.identity.oab_state, 'SP');
+    assert.equal(after.body.identity.user_id, login.body.user.id);
+  });
 
   it('SOLO: cria organization internamente, ADMIN + LAWYER, apenas 1 membro, plano SOLO', async () => {
     const sa = await createSuperAdmin(app);

@@ -82,8 +82,8 @@ function StepBadge({ s }: { s: StepState | undefined }) {
   return <span>{icon}</span>;
 }
 
-const initialOrg = { orgName: '', orgTradeName: '', orgCnpj: '', orgOab: '', orgUf: '', orgAddress: '', orgPhone: '', orgEmail: '' };
-const initialAdmin = { name: '', email: '', password: '', phone: '', oab: '' };
+const initialOrg = { orgName: '', orgTradeName: '', orgCnpj: '', orgAddress: '', orgPhone: '', orgEmail: '' };
+const initialAdmin = { name: '', email: '', password: '', phone: '' };
 const initialSmtp = { host: '', port: '587', user: '', pass: '', from: '', secure: 'false' };
 const initialAi = { provider: 'openai', baseUrl: 'https://api.openai.com/v1', apiKey: '', model: 'gpt-4o-mini' };
 const initialNotif = { emailEnabled: true, newPublication: true, deadlineAlert: true, paymentAlert: false };
@@ -145,24 +145,25 @@ export default function SuperAdminInstall() {
     finally { setBusy(false); setTestingStep(null); }
   };
 
-  /** Etapa unificada SOLO: grava dados profissionais (organization) + credenciais (administrador) de uma vez. */
+  /** Etapa unificada SOLO: grava a organização (nome) + as credenciais iniciais (administrador) de uma vez. */
   const runSoloDetails = async () => {
     setError(null); setMsg(''); setBusy(true); setTestingStep('soloDetails');
     try {
-      const orgRes = await apiPost<{ installation: Installation }>('/api/superadmin/installation/step/organization', org);
+      const orgRes = await apiPost<{ installation: Installation }>('/api/superadmin/installation/step/organization', {
+        orgName: org.orgName,
+        orgEmail: admin.email,
+      });
       setInst(orgRes.installation);
       const adminRes = await apiPost<{ installation: Installation }>('/api/superadmin/installation/step/administrator', {
         name: admin.name,
-        email: org.orgEmail,
+        email: admin.email,
         password: admin.password,
-        phone: org.orgPhone,
-        oab: org.orgOab,
       });
       setInst(adminRes.installation);
       const orgStatus = adminRes.installation?.steps?.organization?.status;
       const admStatus = adminRes.installation?.steps?.administrator?.status;
-      if (orgStatus === 'OK' && admStatus === 'OK') setMsg('✅ Dados do advogado validados (ADMIN + LAWYER).');
-      else setMsg(`ℹ️ Dados do advogado salvos (${orgStatus ?? 'pendente'} / ${admStatus ?? 'pendente'}).`);
+      if (orgStatus === 'OK' && admStatus === 'OK') setMsg('✅ Dados iniciais validados (ADMIN + LAWYER).');
+      else setMsg(`ℹ️ Dados iniciais salvos (${orgStatus ?? 'pendente'} / ${admStatus ?? 'pendente'}).`);
     } catch (e) { setError(e); }
     finally { setBusy(false); setTestingStep(null); }
   };
@@ -329,20 +330,17 @@ export default function SuperAdminInstall() {
                   <div className="rounded-lg border border-brand-100 bg-brand-50 px-4 py-3 text-sm text-brand-800">
                     Plano selecionado: <b>SOLO</b>
                   </div>
-                  <p className="font-display text-sm font-semibold text-gray-700">Dados profissionais</p>
+                  <p className="text-sm text-gray-600">
+                    Apenas os dados iniciais da conta e da organização. A identidade profissional (OAB/UF) será configurada pelo advogado no Perfil após o primeiro acesso.
+                  </p>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div><label className="field-label">Nome completo *</label><Input value={admin.name} onChange={(e) => setAdmin({ ...admin, name: e.target.value })} required /></div>
-                    <div><label className="field-label">Nome profissional</label><Input value={org.orgName} onChange={(e) => setOrg({ ...org, orgName: e.target.value })} placeholder="João Silva Advocacia" required /></div>
-                    <div><label className="field-label">CPF</label><Input value={org.orgCnpj} onChange={(e) => setOrg({ ...org, orgCnpj: e.target.value })} /></div>
-                    <div><label className="field-label">OAB</label><Input value={org.orgOab} onChange={(e) => setOrg({ ...org, orgOab: e.target.value })} /></div>
-                    <div><label className="field-label">UF</label><Input value={org.orgUf} onChange={(e) => setOrg({ ...org, orgUf: e.target.value })} /></div>
-                    <div className="sm:col-span-2"><label className="field-label">Endereço profissional</label><Input value={org.orgAddress} onChange={(e) => setOrg({ ...org, orgAddress: e.target.value })} /></div>
-                    <div><label className="field-label">Telefone</label><Input value={org.orgPhone} onChange={(e) => setOrg({ ...org, orgPhone: e.target.value })} /></div>
-                    <div><label className="field-label">E-mail *</label><Input type="email" value={org.orgEmail} onChange={(e) => setOrg({ ...org, orgEmail: e.target.value })} required /></div>
+                    <div className="sm:col-span-2"><label className="field-label">Nome completo *</label><Input value={admin.name} onChange={(e) => setAdmin({ ...admin, name: e.target.value })} placeholder="João da Silva" required /></div>
+                    <div className="sm:col-span-2"><label className="field-label">Nome da organização *</label><Input value={org.orgName} onChange={(e) => setOrg({ ...org, orgName: e.target.value })} placeholder="João da Silva Advocacia" required /></div>
+                    <div className="sm:col-span-2"><label className="field-label">E-mail de acesso *</label><Input type="email" value={admin.email} onChange={(e) => setAdmin({ ...admin, email: e.target.value })} placeholder="joao@escritorio.com.br" required /></div>
                   </div>
                   <p className="font-display text-sm font-semibold text-gray-700">Credenciais de acesso</p>
                   <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
-                    E-mail de acesso: <b>{org.orgEmail || '—'}</b>
+                    E-mail de acesso: <b>{admin.email || '—'}</b>
                   </div>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="sm:col-span-2">
@@ -351,13 +349,13 @@ export default function SuperAdminInstall() {
                     </div>
                   </div>
                   <div className="rounded-lg border border-warning-100 bg-warning-50 px-4 py-3 text-sm text-warning-800">
-                    Perfil: <b>ADMIN + LAWYER</b>. Esta senha é temporária e deverá ser alterada imediatamente após o primeiro acesso.
+                    Perfil: <b>ADMIN + LAWYER</b>. Esta senha é temporária e deverá ser alterada imediatamente após o primeiro acesso. A OAB/UF é configurada no Perfil.
                   </div>
                   <label className="flex items-center gap-2 text-sm">
                     <input type="checkbox" checked={includePassword} onChange={(e) => setIncludePassword(e.target.checked)} />
                     Incluir senha temporária no relatório de implantação
                   </label>
-                  <Button type="submit" disabled={busy}>{busy ? 'Salvando…' : 'Salvar dados do advogado'}</Button>
+                  <Button type="submit" disabled={busy}>{busy ? 'Salvando…' : 'Salvar dados iniciais'}</Button>
                 </form>
               )}
 
@@ -366,13 +364,11 @@ export default function SuperAdminInstall() {
                   <div className="rounded-lg border border-brand-100 bg-brand-50 px-4 py-3 text-sm text-brand-800">
                     Plano selecionado: <b>OFFICE</b>
                   </div>
-                  <p className="text-sm text-gray-600">Informe os dados do escritório que será utilizado nesta instalação.</p>
+                  <p className="text-sm text-gray-600">Informe os dados do escritório que será utilizado nesta instalação. A identidade profissional de cada usuário (OAB/UF) é configurada no Perfil de cada um.</p>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div><label className="field-label">Nome do escritório *</label><Input value={org.orgName} onChange={(e) => setOrg({ ...org, orgName: e.target.value })} placeholder="Silva & Associados" required /></div>
                     <div><label className="field-label">Nome fantasia</label><Input value={org.orgTradeName} onChange={(e) => setOrg({ ...org, orgTradeName: e.target.value })} /></div>
                     <div><label className="field-label">CNPJ</label><Input value={org.orgCnpj} onChange={(e) => setOrg({ ...org, orgCnpj: e.target.value })} /></div>
-                    <div><label className="field-label">OAB</label><Input value={org.orgOab} onChange={(e) => setOrg({ ...org, orgOab: e.target.value })} /></div>
-                    <div><label className="field-label">UF</label><Input value={org.orgUf} onChange={(e) => setOrg({ ...org, orgUf: e.target.value })} /></div>
                     <div><label className="field-label">Endereço</label><Input value={org.orgAddress} onChange={(e) => setOrg({ ...org, orgAddress: e.target.value })} /></div>
                     <div><label className="field-label">Telefone</label><Input value={org.orgPhone} onChange={(e) => setOrg({ ...org, orgPhone: e.target.value })} /></div>
                     <div><label className="field-label">E-mail</label><Input type="email" value={org.orgEmail} onChange={(e) => setOrg({ ...org, orgEmail: e.target.value })} /></div>
@@ -383,12 +379,11 @@ export default function SuperAdminInstall() {
 
               {current === 'administrator' && (
                 <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void runStep('administrator', admin); }}>
-                  <p className="text-sm text-gray-600">Cadastre o administrador responsável pela instalação.</p>
+                  <p className="text-sm text-gray-600">Cadastre o administrador responsável pela instalação. A OAB/UF será configurada por ele no Perfil após o primeiro acesso.</p>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div><label className="field-label">Nome *</label><Input value={admin.name} onChange={(e) => setAdmin({ ...admin, name: e.target.value })} required /></div>
                     <div><label className="field-label">Email *</label><Input type="email" value={admin.email} onChange={(e) => setAdmin({ ...admin, email: e.target.value })} required /></div>
                     <div><label className="field-label">Telefone</label><Input value={admin.phone} onChange={(e) => setAdmin({ ...admin, phone: e.target.value })} /></div>
-                    <div><label className="field-label">OAB</label><Input value={admin.oab} onChange={(e) => setAdmin({ ...admin, oab: e.target.value })} /></div>
                     <div className="sm:col-span-2">
                       <label className="field-label">Senha inicial (temporária) *</label>
                       <Input type="password" value={admin.password} onChange={(e) => setAdmin({ ...admin, password: e.target.value })} required minLength={8} />

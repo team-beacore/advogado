@@ -157,13 +157,13 @@ export async function stepOrganization(state: WizardState, data: Record<string, 
   const orgRes = await pool.query('INSERT INTO organizations (name, plan_type) VALUES ($1, $2) RETURNING *', [String(data.orgName).trim(), planType]);
   const org = orgRes.rows[0];
   state.organizationId = org.id;
-  state.data = { ...state.data, orgName: String(data.orgName).trim(), orgTradeName: data.orgTradeName ?? null, orgCnpj: data.orgCnpj ?? null, orgOab: data.orgOab ?? null, orgUf: data.orgUf ?? null, orgAddress: data.orgAddress ?? null, orgPhone: data.orgPhone ?? null, orgEmail: data.orgEmail ?? null };
-  // Salvar dados institucionais nas settings da organização
+  // A identidade profissional (OAB/UF) NÃO pertence à instalação/escritório: ela é configurada
+  // por cada usuário em seu Perfil (professional_identities), após o primeiro acesso.
+  state.data = { ...state.data, orgName: String(data.orgName).trim(), orgTradeName: data.orgTradeName ?? null, orgCnpj: data.orgCnpj ?? null, orgAddress: data.orgAddress ?? null, orgPhone: data.orgPhone ?? null, orgEmail: data.orgEmail ?? null };
+  // Salvar dados institucionais nas settings da organização (sem OAB/UF, que são do profissional)
   await saveChannelConfig(org.id, 'institution', {
     tradeName: data.orgTradeName ?? null,
     cnpj: data.orgCnpj ?? null,
-    oab: data.orgOab ?? null,
-    uf: data.orgUf ?? null,
     address: data.orgAddress ?? null,
     phone: data.orgPhone ?? null,
     email: data.orgEmail ?? null,
@@ -176,7 +176,7 @@ export async function stepOrganization(state: WizardState, data: Record<string, 
 // --- STEP 3: ADMINISTRADOR INICIAL ---
 export async function stepAdministrator(state: WizardState, data: Record<string, unknown>): Promise<WizardState> {
   if (!state.organizationId) throw errors.validation('Crie a organização primeiro.');
-  const { name, email, password, phone, oab } = data;
+  const { name, email, password, phone } = data;
   if (!name || !email || !password) throw errors.validation('Nome, email e senha são obrigatórios.');
   if (String(password).length < 8) throw errors.validation('Senha deve ter no mínimo 8 caracteres.');
   const pool = getPool();
@@ -196,7 +196,8 @@ export async function stepAdministrator(state: WizardState, data: Record<string,
     await pool.query('INSERT INTO organization_members (organization_id, user_id, role) VALUES ($1, $2, $3)', [state.organizationId, state.adminUserId, 'ADMIN']);
   }
   // A senha inicial é temporária; guardada apenas no estado do wizard para o relatório (não no banco em texto puro).
-  state.data = { ...state.data, adminName: name, adminEmail: email, adminPhone: phone ?? null, adminOab: oab ?? null, adminInitialPassword: String(password), passwordIsTemporary: true };
+  // A OAB/identidade profissional do administrador é configurada por ele no Perfil após o primeiro acesso.
+  state.data = { ...state.data, adminName: name, adminEmail: email, adminPhone: phone ?? null, adminInitialPassword: String(password), passwordIsTemporary: true };
   await markStep(state, 'administrator', okState('Administrador criado e associado.'), 3);
   void auditLog({ organizationId: state.organizationId, userId: state.adminUserId, action: 'INSTALLATION_ADMIN', entity: 'user', entityId: state.adminUserId, after: { email }, ip: undefined });
   return state;

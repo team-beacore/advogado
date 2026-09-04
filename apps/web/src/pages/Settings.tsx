@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { apiGet, apiPut, apiPost, apiPatch } from '../api/client';
+import { apiGet, apiPut, apiPost } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
-import { Card, Badge, EmptyState, ErrorAlert, Button, SecondaryButton, Input, formatDateTime } from '../components/ui';
+import { Card, Badge, EmptyState, ErrorAlert, Button, SecondaryButton, formatDateTime } from '../components/ui';
 
 interface SecurityReport {
   organization: { id: string; name: string; plan_type?: string | null; created_at: string } | null;
@@ -11,13 +11,6 @@ interface SecurityReport {
   counts: { clients: number; cases: number; leads: number; aiInteractions: number; auditLogs: number };
   ai: { configured: boolean; provider: string | null; model: string | null; baseUrl: string | null; disclaimer: string };
   integrations: Record<string, unknown>;
-}
-
-interface UserNotificationPrefs {
-  emailEnabled: boolean;
-  newPublication: boolean;
-  deadlineAlert: boolean;
-  paymentAlert: boolean;
 }
 
 interface CaptureConfigRow {
@@ -91,10 +84,6 @@ export default function Settings() {
   const [captureRuns, setCaptureRuns] = useState<CaptureRunRow[]>([]);
   const [channelStatus, setChannelStatus] = useState<ChannelStatus[]>([]);
   const [error, setError] = useState<unknown>(null);
-  const [phone, setPhone] = useState(user?.phone ?? '');
-  const [prefs, setPrefs] = useState<UserNotificationPrefs | null>(null);
-  const [profileError, setProfileError] = useState<unknown>(null);
-  const [profileSaving, setProfileSaving] = useState(false);
   const [captureError, setCaptureError] = useState<unknown>(null);
   const [runningSource, setRunningSource] = useState<string | null>(null);
   const [testingSource, setTestingSource] = useState<string | null>(null);
@@ -104,61 +93,20 @@ export default function Settings() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [r, cc, cs, p, runs] = await Promise.all([
+      const [r, cc, cs, runs] = await Promise.all([
         apiGet<SecurityReport>('/api/settings/security'),
         apiGet<CaptureConfigRow[]>('/api/capture/config').catch(() => []),
         apiGet<ChannelStatus[]>('/api/notifications/channels/status').catch(() => []),
-        apiGet<UserNotificationPrefs>('/api/notifications/preferences').catch(() => null),
         apiGet<{ items: CaptureRunRow[] }>('/api/capture/runs').catch(() => ({ items: [] })),
       ]);
       setReport(r);
       setCaptureConfigs(cc);
       setChannelStatus(cs);
-      setPrefs(p);
       setCaptureRuns(runs.items);
-      setPhone(user?.phone ?? '');
     } catch (e) { setError(e); }
-  }, [user?.phone]);
+  }, []);
 
   useEffect(() => { void load(); }, [load]);
-
-  const saveProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setProfileError(null);
-    setProfileSaving(true);
-    try {
-      const res = await apiPatch<{ user: { phone: string | null } }>('/api/auth/me', { phone });
-      setPhone(res.user.phone ?? '');
-    } catch (err) { setProfileError(err); }
-    finally { setProfileSaving(false); }
-  };
-
-  const savePrefs = async (next: Partial<UserNotificationPrefs>) => {
-    setProfileError(null);
-    try {
-      const saved = await apiPut<UserNotificationPrefs>('/api/notifications/preferences', next);
-      setPrefs(saved);
-    } catch (err) { setProfileError(err); }
-  };
-
-  // Senha
-  const [pw, setPw] = useState({ current: '', next: '', confirm: '' });
-  const [pwError, setPwError] = useState<unknown>(null);
-  const [pwMsg, setPwMsg] = useState('');
-  const [pwSaving, setPwSaving] = useState(false);
-
-  const changePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setPwError(null); setPwMsg('');
-    if (pw.next !== pw.confirm) { setPwError(new Error('As senhas novas não conferem.')); return; }
-    setPwSaving(true);
-    try {
-      await apiPost('/api/auth/change-password', { currentPassword: pw.current, newPassword: pw.next });
-      setPw({ current: '', next: '', confirm: '' });
-      setPwMsg('✅ Senha alterada com sucesso.');
-    } catch (err) { setPwError(err); }
-    finally { setPwSaving(false); }
-  };
 
   // Canais — apenas ativar/desativar
   const toggleChannel = async (channel: string, enabled: boolean) => {
@@ -219,65 +167,13 @@ export default function Settings() {
 
   return (
     <div>
-      <h1 className="page-title mb-6">Configurações</h1>
+      <div className="mb-6">
+        <h1 className="page-title">Configurações</h1>
+        <p className="page-subtitle">Configure o funcionamento da sua plataforma.</p>
+      </div>
       <ErrorAlert error={error} />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Perfil e preferências do usuário */}
-        <Card title="Meu perfil e notificações">
-          <form onSubmit={saveProfile} className="space-y-4">
-            <ErrorAlert error={profileError} />
-            <div>
-              <label className="field-label">Telefone do advogado</label>
-              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(21) 99999-9999" />
-              <p className="mt-1 text-xs text-gray-500">Telefone de contato do usuário.</p>
-            </div>
-            <Button type="submit" disabled={profileSaving} className="w-full">{profileSaving ? 'Salvando…' : 'Salvar telefone'}</Button>
-          </form>
-          {prefs && (
-            <div className="mt-5 space-y-3 border-t border-gray-100 pt-4">
-              <div className="text-sm font-semibold text-gray-800">Preferências</div>
-              <label className="flex items-center justify-between text-sm">
-                <span>Receber e-mail</span>
-                <input type="checkbox" checked={prefs.emailEnabled} onChange={(e) => void savePrefs({ emailEnabled: e.target.checked })} />
-              </label>
-              <label className="flex items-center justify-between text-sm">
-                <span>Nova intimação</span>
-                <input type="checkbox" checked={prefs.newPublication} onChange={(e) => void savePrefs({ newPublication: e.target.checked })} />
-              </label>
-              <label className="flex items-center justify-between text-sm">
-                <span>Alertas de prazo</span>
-                <input type="checkbox" checked={prefs.deadlineAlert} onChange={(e) => void savePrefs({ deadlineAlert: e.target.checked })} />
-              </label>
-              <label className="flex items-center justify-between text-sm">
-                <span>Alertas de cobrança</span>
-                <input type="checkbox" checked={prefs.paymentAlert} onChange={(e) => void savePrefs({ paymentAlert: e.target.checked })} />
-              </label>
-            </div>
-          )}
-        </Card>
-
-        {/* Segurança */}
-        <Card title="Segurança">
-          <form onSubmit={changePassword} className="space-y-3">
-            <ErrorAlert error={pwError} />
-            {pwMsg && <div className="rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{pwMsg}</div>}
-            <div>
-              <label className="field-label">Senha atual</label>
-              <Input type="password" value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} autoComplete="current-password" required />
-            </div>
-            <div>
-              <label className="field-label">Nova senha</label>
-              <Input type="password" value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} autoComplete="new-password" required minLength={8} />
-            </div>
-            <div>
-              <label className="field-label">Confirmar nova senha</label>
-              <Input type="password" value={pw.confirm} onChange={(e) => setPw({ ...pw, confirm: e.target.value })} autoComplete="new-password" required minLength={8} />
-            </div>
-            <Button type="submit" className="w-full" disabled={pwSaving}>{pwSaving ? 'Alterando…' : 'Alterar senha'}</Button>
-          </form>
-        </Card>
-
         {/* Security Report */}
         <Card title="Privacidade e Segurança">
           <dl className="space-y-2 text-sm">

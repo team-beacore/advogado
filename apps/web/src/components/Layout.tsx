@@ -29,6 +29,8 @@ const icons: Record<string, string> = {
   monitoring: 'M21 12a9 9 0 1 1-9-9M21 3l-9 9-2.5-2.5M16 3h5v5',
   leads: 'M4 18l5-5 3.5 3.5L20 9M20 9h-4.5M20 9v4.5',
   finance: 'M12 3v18M8.5 7.5h6.2a2.4 2.4 0 0 1 0 4.8H9.3a2.4 2.4 0 0 0 0 4.8h6.2',
+  profile:
+    'M16 19v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 17.5V19M12.5 9.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z',
   settings:
     'M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Zm8-3.2-1.7-.6-.5-1.2.8-1.6-1.7-1.7-1.6.8-1.2-.5L13.5 5h-2.4l-.6 1.7-1.2.5-1.6-.8L6 8.1l.8 1.6-.5 1.2L4.6 11.5v2.4l1.7.6.5 1.2-.8 1.6 1.7 1.7 1.6-.8 1.2.5.6 1.7h2.4l.6-1.7 1.2-.5 1.6.8 1.7-1.7-.8-1.6.5-1.2 1.7-.6v-2.4Z',
 };
@@ -45,10 +47,11 @@ const nav: Array<{ to: string; label: string; icon: string; group: string; end?:
   { to: '/leads', label: 'Leads', icon: 'leads', group: 'Gestão', perm: 'leads.read' },
   { to: '/financeiro', label: 'Financeiro', icon: 'finance', group: 'Gestão', perm: 'billing.read' },
   { to: '/equipe', label: 'Equipe', icon: 'clients', group: 'Gestão', perm: 'team.manage', plan: 'OFFICE' },
-  { to: '/configuracoes', label: 'Configurações', icon: 'settings', group: 'Gestão', perm: 'settings.manage' },
+  { to: '/perfil', label: 'Perfil', icon: 'profile', group: 'Conta' },
+  { to: '/configuracoes', label: 'Configurações', icon: 'settings', group: 'Conta', perm: 'settings.manage' },
 ];
 
-const groups = ['Painel', 'Operação', 'Gestão'];
+const groups = ['Painel', 'Operação', 'Gestão', 'Conta'];
 
 function canSee(item: { perm?: string; plan?: 'SOLO' | 'OFFICE' }, permissions: string[], organizationType: 'SOLO' | 'OFFICE' | null): boolean {
   if (item.plan && organizationType !== item.plan) return false;

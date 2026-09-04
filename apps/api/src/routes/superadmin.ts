@@ -386,9 +386,7 @@ async function buildInstallationReport(state: NonNullable<Awaited<ReturnType<typ
 
   heading('DADOS DA ORGANIZAÇÃO');
   line('Nome', String(d.orgName ?? ''));
-  line('CNPJ/CPF', String(d.orgCnpj ?? ''));
-  line('OAB', String(d.orgOab ?? ''));
-  line('UF', String(d.orgUf ?? ''));
+  line('CNPJ', String(d.orgCnpj ?? ''));
   line('Tipo', state.clientType === 'escritorio' ? 'Escritório' : state.clientType === 'solo' ? 'Advogado Solo' : '—');
   line('Plano', state.clientType === 'escritorio' ? 'OFFICE' : state.clientType === 'solo' ? 'SOLO' : '—');
   y -= 6;
@@ -398,6 +396,7 @@ async function buildInstallationReport(state: NonNullable<Awaited<ReturnType<typ
   line('Email', String(d.adminEmail ?? ''));
   line('Telefone', String(d.adminPhone ?? ''));
   line('Perfil', 'ADMIN + LAWYER');
+  line('Identidade profissional', 'Configurada pelo usuário no Perfil após o primeiro acesso.');
   if (includePassword && d.adminInitialPassword) {
     line('Senha inicial temporária', String(d.adminInitialPassword));
     page.drawText('IMPORTANTE: credencial temporária de implantação. O administrador deve alterá-la imediatamente após o primeiro acesso.', { x: 50, y: y - 4, size: 9, font, color: rgb(0.8, 0.2, 0.2) });

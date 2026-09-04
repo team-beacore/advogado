@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiGet, apiPut, apiPost } from '../api/client';
-import { Badge, EmptyState, ErrorAlert, Button, SecondaryButton, Input, statusColor, statusLabel, formatDateTime } from '../components/ui';
+import { Badge, EmptyState, ErrorAlert, Button, SecondaryButton, statusColor, statusLabel, formatDateTime } from '../components/ui';
 import { useAuth } from '../auth/AuthContext';
 
 interface DiscoveryItem {
@@ -99,10 +99,7 @@ export default function ProcessDiscovery() {
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [providers, setProviders] = useState<ProviderStatus[]>([]);
   const [identityLoading, setIdentityLoading] = useState(true);
-  const [savingIdentity, setSavingIdentity] = useState(false);
-  const [identityForm, setIdentityForm] = useState({ professionalName: '', oabNumber: '', oabState: '' });
   const [identityError, setIdentityError] = useState<unknown>(null);
-  const [editingIdentity, setEditingIdentity] = useState(false);
 
   // Execução de descoberta
   const [running, setRunning] = useState(false);
@@ -126,17 +123,11 @@ export default function ProcessDiscovery() {
 
   const loadContext = async () => {
     setIdentityLoading(true);
+    setIdentityError(null);
     try {
       const me = await apiGet<{ identity: Identity | null }>('/api/professional-identity/me');
       setIdentity(me.identity);
-      if (me.identity) {
-        setIdentityForm({
-          professionalName: me.identity.professional_name ?? '',
-          oabNumber: me.identity.oab_number ?? '',
-          oabState: me.identity.oab_state ?? '',
-        });
-      }
-    } catch { /* identidade não configurada ainda */ }
+    } catch (e) { setIdentityError(e); }
     try {
       const st = await apiGet<{ providers: ProviderStatus[] }>('/api/process-discovery/status');
       setProviders(st.providers);
@@ -146,22 +137,6 @@ export default function ProcessDiscovery() {
 
   useEffect(() => { void load(); }, [statusFilter]);
   useEffect(() => { void loadContext(); }, []);
-
-  const saveIdentity = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIdentityError(null);
-    setSavingIdentity(true);
-    try {
-      await apiPut('/api/professional-identity/me', {
-        professionalName: identityForm.professionalName.trim(),
-        oabNumber: identityForm.oabNumber.trim(),
-        oabState: identityForm.oabState.trim().toUpperCase(),
-      });
-      setEditingIdentity(false);
-      await loadContext();
-    } catch (err) { setIdentityError(err); }
-    finally { setSavingIdentity(false); }
-  };
 
   const runDiscovery = async () => {
     setRunResult(null);
@@ -191,7 +166,7 @@ export default function ProcessDiscovery() {
     <div className="space-y-6">
       <div>
         <h1 className="page-title">Descoberta de processos</h1>
-        <p className="page-subtitle">Informe sua identidade profissional e descubra processos relacionados nas fontes judiciais consultadas.</p>
+        <p className="page-subtitle">Utiliza a sua identidade profissional (configurada no Perfil) para descobrir processos nas fontes judiciais.</p>
       </div>
 
       <ErrorAlert error={error} />
@@ -212,78 +187,26 @@ export default function ProcessDiscovery() {
         ) : !identity ? (
           <div>
             <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              Configure sua identidade profissional para descobrir seus processos.
+              A descoberta utiliza a sua <b>identidade profissional</b>, que é configurada no seu <b>Perfil</b>.
+              Cadastre sua OAB/UF para descobrir seus processos.
             </div>
-            <form onSubmit={saveIdentity} className="max-w-md space-y-3">
-              <ErrorAlert error={identityError} />
-              <div>
-                <label className="field-label">Nome do advogado(a)</label>
-                <Input
-                  value={identityForm.professionalName}
-                  onChange={(e) => setIdentityForm({ ...identityForm, professionalName: e.target.value })}
-                  placeholder="Ex.: Maria da Silva"
-                  required
-                  minLength={2}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="field-label">Nº OAB</label>
-                  <Input
-                    value={identityForm.oabNumber}
-                    onChange={(e) => setIdentityForm({ ...identityForm, oabNumber: e.target.value })}
-                    placeholder="123456"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="field-label">UF</label>
-                  <Input
-                    value={identityForm.oabState}
-                    onChange={(e) => setIdentityForm({ ...identityForm, oabState: e.target.value.toUpperCase() })}
-                    placeholder="RJ"
-                    maxLength={2}
-                    required
-                  />
-                </div>
-              </div>
-              <Button type="submit" disabled={savingIdentity}>
-                {savingIdentity ? 'Salvando…' : '[ Configurar identidade ]'}
-              </Button>
-            </form>
+            <ErrorAlert error={identityError} />
+            <Link
+              to="/perfil"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-800"
+            >
+              Configurar identidade no Perfil
+            </Link>
           </div>
         ) : (
           <div>
             <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
               <span className="font-semibold text-gray-900">{identity.professional_name}</span>
               <span className="text-gray-500">OAB/{identity.oab_state ?? '—'} {identity.oab_number ?? '—'}</span>
-              {canRun && (
-                <button onClick={() => setEditingIdentity((v) => !v)} className="text-xs font-medium text-brand-700 hover:text-brand-800">
-                  {editingIdentity ? 'Cancelar edição' : 'Editar identidade'}
-                </button>
-              )}
+              <Link to="/perfil" className="text-xs font-medium text-brand-700 hover:text-brand-800">
+                Editar identidade no Perfil
+              </Link>
             </div>
-
-            {editingIdentity && (
-              <form onSubmit={saveIdentity} className="mb-4 max-w-md space-y-3">
-                <ErrorAlert error={identityError} />
-                <div>
-                  <label className="field-label">Nome do advogado(a)</label>
-                  <Input value={identityForm.professionalName} onChange={(e) => setIdentityForm({ ...identityForm, professionalName: e.target.value })} required minLength={2} />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="field-label">Nº OAB</label>
-                    <Input value={identityForm.oabNumber} onChange={(e) => setIdentityForm({ ...identityForm, oabNumber: e.target.value })} required />
-                  </div>
-                  <div>
-                    <label className="field-label">UF</label>
-                    <Input value={identityForm.oabState} onChange={(e) => setIdentityForm({ ...identityForm, oabState: e.target.value.toUpperCase() })} maxLength={2} required />
-                  </div>
-                </div>
-                <Button type="submit" disabled={savingIdentity}>{savingIdentity ? 'Salvando…' : 'Salvar identidade'}</Button>
-              </form>
-            )}
 
             <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {providers.length === 0 ? (
